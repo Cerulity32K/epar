@@ -1,0 +1,14 @@
+[package]
+name = "exclusively_polygons_alongside_rhythms"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+macroquad = "0.3.25"
+perlin2d = "0.2.6"
+rand = "0.8.5"
+soloud = "1.0.2"
+strum = "0.25.0"
+strum_macros = "0.25.0"
