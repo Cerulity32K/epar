@@ -14,7 +14,7 @@ macro_rules! fobe {
 }
 
 /// F-777 - Inferno
-pub fn inferno(state: &mut GameState) -> f32 {
+pub fn inferno(state: &mut GameState) -> (f32, f32, &'static str) {
     let rapid_lasers = repeat_periodic(LaserSpawner::new(2.0, 1.0, 45.0, 10.0), 96, 2.0, 0.25);
     let snare_bombs = repeat_periodic(BombSideSpawner::new(12, 200.0, 12.5, 2.0), 7, 4.0, 4.0);
     let drops = 12;
@@ -68,7 +68,7 @@ pub fn inferno(state: &mut GameState) -> f32 {
         .chain(spiralsurge)
         .chain(rise)
     );
-    170.0
+    (-4.0, 170.0, "music/inferno.mp3")
 }
 
 /// Meganeko - Moonlight Sonata (3rd Movement) Remix

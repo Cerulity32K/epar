@@ -45,13 +45,15 @@ async fn main() -> CanErr {
     loop {
         match state.epar_state {
             EparState::MainMenu => {
-                let length = EparLevel::COUNT;
+                let show_unfinished = is_key_down(KeyCode::U);
+                let lvls = EparLevel::iter().filter(move |lvl| show_unfinished || lvl.finished()).collect::<Vec<_>>();
+                let length = lvls.len();
                 let rect_height = screen_height() / length as f32;
                 let rect_width = screen_width();
                 let rect_padding = 50.0;
                 let pos = mouse_position();
                 let mouse_pos = vec2(pos.0, pos.1);
-                'elit: for (idx, lvl) in EparLevel::iter().enumerate() {
+                'elit: for (idx, lvl) in lvls.into_iter().enumerate() {
                     let y_offset = -((length as f32 - 1.0) / 2.0 - idx as f32) * rect_height + screen_height() / 2.0;
                     let x_offset = screen_width() / 2.0;
                     let rsize = vec2(rect_width, rect_height) - rect_padding;
@@ -75,7 +77,7 @@ async fn main() -> CanErr {
                     let fsize = 40;
                     let txt = &format!("{lvl}");
                     let dims = measure_text(txt, None, fsize, 1.0);
-                    draw_text(txt, x_offset - dims.width / 2.0, y_offset + dims.offset_y / 2.0, fsize as f32, WHITE);
+                    draw_text(txt, x_offset - dims.width / 2.0, y_offset + dims.offset_y / 2.0, fsize as f32, if lvl.finished() { WHITE } else { RED });
                 }
                 next_frame().await;
             }
