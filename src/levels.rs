@@ -13,7 +13,7 @@ macro_rules! fobe {
     };
 }
 
-/// F-777 - Inferno
+/// F-777 - Inferno (Pyro's Theme)
 pub fn inferno(state: &mut GameState) -> (f32, f32, &'static str) {
     let rapid_lasers = repeat_periodic(LaserSpawner::new(2.0, 1.0, 45.0, 10.0), 96, 2.0, 0.25);
     let snare_bombs = repeat_periodic(BombSideSpawner::new(12, 200.0, 12.5, 2.0), 7, 4.0, 4.0);
@@ -35,9 +35,9 @@ pub fn inferno(state: &mut GameState) -> (f32, f32, &'static str) {
         ))))
     )).collect::<Vec<GSEvent>>();
 
-    let slam = vec![GSEvent(26.0, box |accum: &mut UpdateAccumulator, smargs| {
+    let slam = vec![GSEvent(26.0, Box::new(|accum: &mut UpdateAccumulator, smargs| {
         accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -30.0), vec2(screen_width() / 2.0, screen_height() + 30.0), 100.0, 2.0, 4.0, 0.1, vec2(0.0, 30.0), 0.0))
-    })];
+    }))];
 
     let spiralsurge = [
         GSEvent(48.5, Box::new(|ac: &mut UpdateAccumulator, _|ac.obst(Periodic::new(400, 0.005, Periodic::rect_trail(
@@ -68,7 +68,7 @@ pub fn inferno(state: &mut GameState) -> (f32, f32, &'static str) {
         .chain(spiralsurge)
         .chain(rise)
     );
-    (-4.0, 170.0, "music/inferno.mp3")
+    (0.0, 170.0, "music/inferno.mp3")
 }
 
 /// Meganeko - Moonlight Sonata (3rd Movement) Remix
@@ -77,24 +77,24 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
     let bpm = 177.5;
 
     // Bombs
-    state.add_event(GSEvent(-11.0, box |accum: &mut UpdateAccumulator, _| {
-        accum.obst(Bomb::new(Vec2::ZERO, Vec2::ZERO, 2.0, 50, 200.0, 5.0, box Bomb::pellet_spawner));
-        accum.obst(Bomb::new(screen_size(), screen_size(), 2.0, 50, 200.0, 5.0, box Bomb::pellet_spawner));
-        accum.obst(Bomb::new(screen(0.0, 1.0), screen(0.0, 1.0), 2.0, 50, 200.0, 5.0, box Bomb::pellet_spawner));
-        accum.obst(Bomb::new(screen(1.0, 0.0), screen(1.0, 0.0), 2.0, 50, 200.0, 5.0, box Bomb::pellet_spawner));
-    }));
+    state.add_event(GSEvent(-11.0, Box::new(|accum: &mut UpdateAccumulator, _| {
+        accum.obst(Bomb::new(Vec2::ZERO, Vec2::ZERO, 2.0, 50, 200.0, 5.0, Box::new(Bomb::pellet_spawner)));
+        accum.obst(Bomb::new(screen_size(), screen_size(), 2.0, 50, 200.0, 5.0, Box::new(Bomb::pellet_spawner)));
+        accum.obst(Bomb::new(screen(0.0, 1.0), screen(0.0, 1.0), 2.0, 50, 200.0, 5.0, Box::new(Bomb::pellet_spawner)));
+        accum.obst(Bomb::new(screen(1.0, 0.0), screen(1.0, 0.0), 2.0, 50, 200.0, 5.0, Box::new(Bomb::pellet_spawner)));
+    })));
     state.add_events(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(Bomb::new(vec2(screen_width(), screen_height() / 2.0), vec2(screen_width() - 200.0, screen_height() / 2.0), 2.0, 8, 250.0, 6.0, box Bomb::pellet_spawner))
+        accum.obst(Bomb::new(vec2(screen_width(), screen_height() / 2.0), vec2(screen_width() - 200.0, screen_height() / 2.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
     }, 4, -2.0, 1.0));
     state.add_events(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(Bomb::new(vec2(0.0, screen_height() / 2.0), vec2(200.0, screen_height() / 2.0), 2.0, 8, 250.0, 6.0, box Bomb::pellet_spawner))
+        accum.obst(Bomb::new(vec2(0.0, screen_height() / 2.0), vec2(200.0, screen_height() / 2.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
     }, 4, 2.0, 1.0));
     state.add_events(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(Bomb::new(vec2(screen_width() / 2.0, 0.0), vec2(screen_width() / 2.0, 200.0), 2.0, 8, 250.0, 6.0, box Bomb::pellet_spawner))
+        accum.obst(Bomb::new(vec2(screen_width() / 2.0, 0.0), vec2(screen_width() / 2.0, 200.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
     }, 4, 6.0, 1.0));
     
     state.add_events(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(Bomb::new(vec2(screen_width() / 2.0, screen_height()), vec2(screen_width() / 2.0, screen_height() - 200.0), 2.0, 8, 250.0, 6.0, box Bomb::pellet_spawner))
+        accum.obst(Bomb::new(vec2(screen_width() / 2.0, screen_height()), vec2(screen_width() / 2.0, screen_height() - 200.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
     }, 4, 10.0, 1.0));
 
     state.add_events(repeat_periodic(BombSideSpawner::new(16, 300.0, 10.0, 2.0), 24, 14.0, 1.0));
@@ -104,15 +104,15 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
         accum.obst(SlamLaser::new(vec2(gen_range(0.0, screen_width()), -50.0), vec2(gen_range(0.0, screen_width()), screen_height() + 50.0), 25.0, 4.0, 2.0, 0.2, vec2(0.0, 20.0), 0.0));
         accum.obst(SlamLaser::new(vec2(gen_range(0.0, screen_width()), -50.0), vec2(gen_range(0.0, screen_width()), screen_height() + 50.0), 25.0, 4.0, 2.0, 0.2, vec2(0.0, 20.0), 0.0));
     }, 24, 12.0, 1.0));
-    state.add_event(GSEvent(36.0, box |accum: &mut UpdateAccumulator, _| {
+    state.add_event(GSEvent(36.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -50.0), vec2(screen_width() / 2.0, screen_height() + 50.0), 100.0, 4.0, 6.0, 0.2, vec2(0.0, 20.0), 10.0));
-    }));
-    state.add_event(GSEvent(38.0, box |accum: &mut UpdateAccumulator, _| {
+    })));
+    state.add_event(GSEvent(38.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -50.0), vec2(screen_width() / 2.0, screen_height() + 50.0), 200.0, 4.0, 6.0, 0.2, vec2(-10.0, 20.0), 40.0));
-    }));
-    state.add_event(GSEvent(40.0, box |accum: &mut UpdateAccumulator, _| {
+    })));
+    state.add_event(GSEvent(40.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -50.0), vec2(screen_width() / 2.0, screen_height() + 50.0), 400.0, 4.0, 6.0, 0.2, vec2(10.0, 20.0), 100.0));
-    }));
+    })));
     
     let mut quick_slam = repeat_periodic(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(gen_range(0.0, screen_width()), -50.0), vec2(gen_range(0.0, screen_width()), screen_height() + 50.0), 50.0, 4.0, 2.0, 0.2, vec2(0.0, 20.0), 0.0));
@@ -122,36 +122,36 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
     state.add_events(quick_slam);
     state.add_events(repeat_periodic(LaserSpawner::new(2.0, 1.0, 45.0, 30.0), 48, 58.0, 0.25));
 
-    state.add_event(GSEvent(68.0, box |accum: &mut UpdateAccumulator, _| {
+    state.add_event(GSEvent(68.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -250.0), vec2(screen_width() / 2.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
-    }));
-    state.add_event(GSEvent(70.0, box |accum: &mut UpdateAccumulator, _| {
+    })));
+    state.add_event(GSEvent(70.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(screen_width() / 2.0 - screen_height() / 2.0 - 250.0, -250.0), vec2(screen_width() / 2.0 + screen_height() / 2.0 + 250.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
         accum.obst(SlamLaser::new(vec2(screen_width() / 2.0 + screen_height() / 2.0 + 250.0, -250.0), vec2(screen_width() / 2.0 - screen_height() / 2.0 - 250.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
-    }));
-    state.add_event(GSEvent(72.0, box |accum: &mut UpdateAccumulator, _|accum.fg(RED)));
-    state.add_event(GSEvent(72.0, box |accum: &mut UpdateAccumulator, _| {
+    })));
+    state.add_event(GSEvent(72.0, Box::new(|accum: &mut UpdateAccumulator, _|accum.fg(RED))));
+    state.add_event(GSEvent(72.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(-250.0, screen_height() / 4.0), vec2(screen_width() + 250.0, screen_height() / 4.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
         accum.obst(SlamLaser::new(vec2(-250.0, screen_height() / 4.0 * 3.0), vec2(screen_width() + 250.0, screen_height() / 4.0 * 3.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
-    }));
-    state.add_event(GSEvent(74.0, box |accum: &mut UpdateAccumulator, _| {
+    })));
+    state.add_event(GSEvent(74.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(100.0, -250.0), vec2(100.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
         accum.obst(SlamLaser::new(vec2(screen_width() - 100.0, -250.0), vec2(screen_width() - 100.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
         accum.obst(SlamLaser::new(vec2(-250.0, screen_height() / 2.0), vec2(screen_width() + 250.0, screen_height() / 2.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
-    }));
-    state.add_event(GSEvent(76.0, box |accum: &mut UpdateAccumulator, _| {
+    })));
+    state.add_event(GSEvent(76.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -250.0), vec2(screen_width() / 2.0, screen_height() + 250.0), 400.0, 4.0, 4.0, 0.2, vec2(10.0, 20.0), 150.0).leave_time(1.0));
-    }));
-    state.add_event(GSEvent(80.0, box |accum: &mut UpdateAccumulator, _| {
+    })));
+    state.add_event(GSEvent(80.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(Vec2::ZERO, screen_size(), 400.0, 4.0, 4.0, 0.2, vec2(10.0, 20.0), 150.0).leave_time(1.0));
         accum.obst(SlamLaser::new(vec2(screen_width(), 0.0), vec2(0.0, screen_height()), 400.0, 4.0, 4.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
-    }));
-    state.add_event(GSEvent(84.0, box |accum: &mut UpdateAccumulator, _| {
+    })));
+    state.add_event(GSEvent(84.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -400.0), vec2(screen_width() / 2.0, screen_height() + 400.0), 800.0, 4.0, 16.0, 0.2, vec2(10.0, 20.0), 400.0).leave_time(16.0));
-    }));
+    })));
 
     // Rotatable rectangles
-    state.add_event(GSEvent(8.0, box |accum: &mut UpdateAccumulator, _| {
+    state.add_event(GSEvent(8.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(RotatingRect {
             center: screen_center(),
             size: vec2(screen_width() * 2.0, 50.0),
@@ -184,19 +184,19 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
         });
         accum.obst(SlamLaser::new(vec2(100.0, -50.0), vec2(100.0, screen_height() + 50.0), 200.0, 8.0, 24.0, 0.2, Vec2::ZERO, 25.0));
         accum.obst(SlamLaser::new(vec2(screen_width() - 100.0, -50.0), vec2(screen_width() - 100.0, screen_height() + 50.0), 200.0, 8.0, 24.0, 0.2, Vec2::ZERO, 25.0));
-    }));
+    })));
 
     // Trails
-    state.add_event(GSEvent(40.0, box |accum: &mut UpdateAccumulator, _| {
+    state.add_event(GSEvent(40.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         for i in 0..15 {
             accum.obst(Periodic::new(50, 0.25, Periodic::linear(2.0, 4.0, 0.25, vec2(screen_width() / 2.0 + 209.0, i as f32 * screen_height() / 14.0), vec2(20.0, 0.0), vec2(18.0, 18.0), 0.0)));
             accum.obst(Periodic::new(50, 0.25, Periodic::linear(2.0, 4.0, 0.25, vec2(screen_width() / 2.0 - 209.0, i as f32 * screen_height() / 14.0), vec2(-20.0, 0.0), vec2(18.0, 18.0), 0.0)));
         }
-    }));
+    })));
 
     // chiptune blips
-    state.add_event(GSEvent(-23.1, box |accum: &mut UpdateAccumulator, _| {
-        accum.obst(Periodic::new(28, 0.375, box |ac: &mut UpdateAccumulator, _| {
+    state.add_event(GSEvent(-23.1, Box::new(|accum: &mut UpdateAccumulator, _| {
+        accum.obst(Periodic::new(28, 0.375, Box::new(|ac: &mut UpdateAccumulator, _| {
             for i in 0..8 {
                 ac.obst(RotatableRect {
                     center: floor_vec(rand_vec(Vec2::ZERO, screen_size()), vec2(20.0, 20.0)),
@@ -208,8 +208,8 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
                     grow_time: 0.25
                 });
             }
-        }));
-    }));
+        })));
+    })));
 
     // Color changes
     state.add_event(GSEvent(16.0, Box::new(|gs: &mut UpdateAccumulator, _| gs.smi(|state: &mut GameState, _| {
@@ -221,9 +221,9 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
     }))));
     state.add_event(GSEvent(46.0, Box::new(|gs: &mut UpdateAccumulator, _| {
         gs.bg(BLACK);
-        gs.obst(Periodic::new(80, 0.125, box |accum: &mut UpdateAccumulator, smargs: ModifyArgs| {
+        gs.obst(Periodic::new(80, 0.125, Box::new(|accum: &mut UpdateAccumulator, smargs: ModifyArgs| {
             accum.obst(Pellet::new(vec2(screen_width() / 2.0, screen_height() - smargs.step as f32 * screen_height() / 80.0), vec2((smargs.step as f32).sin(), (smargs.step as f32).cos()) * 150.0, 12.5));
-        }))
+        })))
     })));
     state.add_event(GSEvent(56.0, Box::new(|gs: &mut UpdateAccumulator, _| {
         gs.smi(|state: &mut GameState, _| {
@@ -237,9 +237,9 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
 /// Aperture Science Psychoacoustic Laboratories - Friendly Faith Plate
 pub fn friendly_faith_plate(state: &mut GameState) -> (f32, f32, &'static str) {
     let bpm = 120.0;
-    state.add_event(GSEvent(NEG_INFINITY, box |accum: &mut UpdateAccumulator, _| {
+    state.add_event(GSEvent(NEG_INFINITY, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.fg(cmul(WHITE, 0.75));
-    }));
+    })));
     state.add_events(vec![].into_iter()
         .chain(rep_off([
             0.0, 0.25, 0.5, 1.0, 1.5, 1.75,
@@ -247,26 +247,26 @@ pub fn friendly_faith_plate(state: &mut GameState) -> (f32, f32, &'static str) {
             4.0, 4.25, 4.5, 4.75, 5.0, 5.25, 5.5, 5.75,
             6.0, 6.25, 6.5, 7.0, 7.25, 7.5
         ], 4, 8.0).into_iter().map(|n|
-            GSEvent(n - 2.0, box move |accum: &mut UpdateAccumulator, _| {
+            GSEvent(n - 2.0, Box::new(move |accum: &mut UpdateAccumulator, _| {
                 let w = screen_width();
                 for _ in 0..1 {
                     accum.obst(GrowLaser::new(
-                        vec2(gen_range(0.0, w * 2.0), -20.0),
-                        vec2(gen_range(-w, w), screen_height() + 20.0),
+                        vec2(gen_range(w, w * 3.0), -20.0 - screen_height()),
+                        vec2(gen_range(-w * 2.0, 0.0), screen_height() * 2.0 + 20.0),
                         50.0, 2.0, 1.0, Vec2::ZERO)
-                            .grow_time(n / 512.0)
-                            .fade_in(0.0)
+                            .grow_time(0.125)
+                            .fade_in(0.125)
                             .fade_opacity(0.25)
                     )
                 }
-            })
+            }))
         ))
         .chain(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
             for i in 0..2 {
                 let pos = vec2(screen_width(), gen_range(screen_height() * 0.1, screen_height() * 0.9));
                 accum.obst(Bomb::new(
                     pos, pos + vec2(-80.0, gen_range(-50.0, 50.0)),
-                    1.0, 20, 400.0, 5.0, box Bomb::pellet_spawner
+                    1.0, 20, 400.0, 5.0, Box::new(Bomb::pellet_spawner)
                 ))
             }
         }, 32, 31.0, 1.0))
@@ -274,11 +274,12 @@ pub fn friendly_faith_plate(state: &mut GameState) -> (f32, f32, &'static str) {
     (-2.05, bpm, "music/[120] friendly_faith_plate.mp3")
 }
 
+/// Cowbell Cult - Smoke (feat. JOEHDAH)
 pub fn smoke(state: &mut GameState) -> (f32, f32, &'static str) {
     let bpm = 74.0;
     let mult = 1.1;
     state.add_events([
-        GSEvent(-1.0, box |accum: &mut UpdateAccumulator, _| {
+        GSEvent(-1.0, Box::new(|accum: &mut UpdateAccumulator, _| {
             let slsp = 200.0;
             let slrd = 15.0;
 
@@ -331,9 +332,9 @@ pub fn smoke(state: &mut GameState) -> (f32, f32, &'static str) {
                     (22.25, SmokeEvent::Lasers(3, 6.0 * 2.0 / 21.0)),
                 ], 2, 8.0)).sort()
             );
-        }),
+        })),
 
-        GSEvent(30.0, box |accum: &mut UpdateAccumulator, _| {
+        GSEvent(30.0, Box::new(|accum: &mut UpdateAccumulator, _| {
             let slsp = 200.0;
             let slrd = 15.0;
 
@@ -364,9 +365,9 @@ pub fn smoke(state: &mut GameState) -> (f32, f32, &'static str) {
 
             accum.obst(dual.clone());
             accum.obst(dual.disp_phase(0.5));
-        }),
+        })),
 
-        GSEvent(48.0, box move |accum: &mut UpdateAccumulator, _| {
+        GSEvent(48.0, Box::new(move |accum: &mut UpdateAccumulator, _| {
             let slsp = 200.0 * mult;
             let slrd = 15.0;
 
@@ -423,9 +424,9 @@ pub fn smoke(state: &mut GameState) -> (f32, f32, &'static str) {
                 }
             }
             accum.obst(sm3);
-        }),
+        })),
 
-        GSEvent(88.0, box |accum: &mut UpdateAccumulator, _| {
+        GSEvent(88.0, Box::new(|accum: &mut UpdateAccumulator, _| {
             let slsp = 200.0;
             let slrd = 15.0;
 
@@ -467,19 +468,20 @@ pub fn smoke(state: &mut GameState) -> (f32, f32, &'static str) {
             };
 
             accum.obst(single);
-        }),
-        GSEvent(f32::NEG_INFINITY, box |accum: &mut UpdateAccumulator, _| {
+        })),
+        GSEvent(f32::NEG_INFINITY, Box::new(|accum: &mut UpdateAccumulator, _| {
             accum.float(20.0);
             accum.bg(cmul(mix(WHITE, ORANGE, 0.5), 0.2));
             accum.fg(cmul(mix(WHITE, RED, 0.5), 0.6));
-        })
+        }))
     ]);
     (-1.678 * bpm / 60.0, bpm, "./music/smoke.mp3")
 }
 
+/// Shirobon - Granite
 pub fn granite(state: &mut GameState) -> (f32, f32, &'static str) {
     let bpm = 128.0;
-    state.add_event(GSEvent(62.0, box |accum: &mut UpdateAccumulator, _| {
+    state.add_event(GSEvent(62.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.obst(GOLGrid::default()
             .dims(64, 36)
             .first_warning_time(2.0)
@@ -487,11 +489,17 @@ pub fn granite(state: &mut GameState) -> (f32, f32, &'static str) {
             .max(64)
             .populate(400)
         );
-    }));
-    state.add_event(GSEvent(64.0, box |accum: &mut UpdateAccumulator, _| {
+    })));
+    state.add_event(GSEvent(64.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.bg(cmul(SKYBLUE, 0.1));
         accum.fg(SKYBLUE);
         accum.float(40.0);
-    }));
+    })));
     (0.05 / bpm * 60.0, bpm, "music/granite.mp3")
+}
+
+/// Nighthawk22 - Isolation (LIMBO Remix)
+pub fn isolation(state: &mut GameState) -> (f32, f32, &'static str) {
+    let bpm = 200.0;
+    (0.0, bpm, "music/isolation.mp3")
 }

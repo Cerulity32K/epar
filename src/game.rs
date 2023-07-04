@@ -24,7 +24,8 @@ pub struct ModifyArgs {
     pub step: usize,
     pub pos: Vec2,
     pub vel: Vec2,
-    pub rad: f32
+    pub rad: f32,
+    pub time: f32
 }
 macro_rules! builder {
     ($name:tt: $type:ty) => {
@@ -32,7 +33,7 @@ macro_rules! builder {
     };
 }
 impl ModifyArgs {
-    pub fn new() -> Self { Self::default() }
+    pub fn new(time: f32) -> Self { ModifyArgs { time, ..Self::default() } }
     builder!(step: usize);
     builder!(pos: Vec2);
     builder!(vel: Vec2);
@@ -46,9 +47,13 @@ pub struct UpdateAccumulator {
     bg: Option<Color>,
     fg: Option<Color>,
     float: Option<f32>,
-    shake: f32
+    shake: f32,
+    time: f32,
 }
 impl UpdateAccumulator {
+    pub fn time(&self) -> f32 {
+        self.time
+    }
     pub fn new() -> Self {
         UpdateAccumulator {
             obstacles_to_add: vec![],
@@ -58,10 +63,11 @@ impl UpdateAccumulator {
             fg: None,
             float: None,
             shake: 0.0,
+            time: 0.0
         }
     }
     pub fn obst(&mut self, obst: impl Obstacle) {
-        self.obstacles_to_add.push(Obst::new(obst.box_clone()));
+        self.obstacles_to_add.push(Obst::new(obst.box_clone(), self.time));
     }
     pub fn obstacle(&mut self, obst: Obst) {
         self.obstacles_to_add.push(obst);
@@ -85,7 +91,7 @@ impl UpdateAccumulator {
         self.events.push(modifier);
     }
     pub fn smi(&mut self, modifier: impl StateModifier + 'static) {
-        self.events.push(box modifier);
+        self.events.push(Box::new(modifier));
     }
 }
 
@@ -94,7 +100,7 @@ pub trait StateModifier {
     fn box_clone(&self) -> Box<dyn StateModifier>;
 }
 
-impl<T> StateModifier for T where T: Fn(&mut GameState, ModifyArgs) + Clone + 'static{
+impl<T> StateModifier for T where T: Fn(&mut GameState, ModifyArgs) + Clone + 'static {
     fn box_clone(&self) -> Box<dyn StateModifier> {
         Box::new(self.clone())
     }
@@ -108,23 +114,12 @@ pub trait Accumulatee {
     fn box_clone(&self) -> Box<dyn Accumulatee>;
 }
 
-impl<T> Accumulatee for T where T: Fn(&mut UpdateAccumulator, ModifyArgs) + Clone + 'static{
+impl<T> Accumulatee for T where T: Fn(&mut UpdateAccumulator, ModifyArgs) + Clone + 'static {
     fn box_clone(&self) -> Box<dyn Accumulatee> {
         Box::new(self.clone())
     }
     fn run(&self, to_add: &mut UpdateAccumulator, sm: ModifyArgs) {
         self(to_add, sm)
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct ClosureSM<T: Fn(&mut UpdateAccumulator) + Clone + 'static>(pub T);
-impl<T: Fn(&mut UpdateAccumulator) + Clone> Accumulatee for ClosureSM<T> {
-    fn box_clone(&self) -> Box<dyn Accumulatee> {
-        Box::new(self.clone())
-    }
-    fn run(&self, gs: &mut UpdateAccumulator, _: ModifyArgs) {
-        (self.0)(gs)
     }
 }
 
@@ -170,8 +165,8 @@ impl GameState {
             player: Player::default(),
             time: 0.0,
             hits_left: 3,
-            fg_color: box |_|Color::new(1.0, 0.0, 0.5, 1.0),
-            bg_color: box |_|Color::new(0.0, 0.0, 0.0, 1.0),
+            fg_color: Box::new(|_|Color::new(1.0, 0.0, 0.5, 1.0)),
+            bg_color: Box::new(|_|Color::new(0.0, 0.0, 0.0, 1.0)),
             cam_jerk: Vec2::ZERO,
             cam_shake: 0.0,
             cam_float: 0.0,
@@ -196,8 +191,8 @@ impl GameState {
     }
     pub fn reset(&mut self) {
         self.mus.stop();
-        self.fg_color = box |_|Color::new(1.0, 0.0, 0.5, 1.0);
-        self.bg_color = box |_|Color::new(0.0, 0.0, 0.0, 1.0);
+        self.fg_color = Box::new(|_|Color::new(1.0, 0.0, 0.5, 1.0));
+        self.bg_color = Box::new(|_|Color::new(0.0, 0.0, 0.0, 1.0));
         self.cam_float = 0.0;
         self.cam_jerk = Vec2::ZERO;
         self.cam_shake = 0.0;
@@ -246,8 +241,10 @@ impl GameState {
         let smargs = ModifyArgs::default();
         let mut accum = UpdateAccumulator::new();
         'event_calls: loop {
-            if self.events.len() > 0 && self.events[0].0 <= mus_time {
+            let time = self.events[0].0;
+            if self.events.len() > 0 && time <= mus_time {
                 let ev = self.events.remove(0);
+                accum.time = time;
                 ev.1.run(&mut accum, smargs);
             } else {
                 break 'event_calls;
@@ -272,7 +269,8 @@ impl GameState {
 
         let mut i = 0;
         while i < self.obsts.len() {
-            self.obsts[i].obstacle.update(&mut accum, frame_time, frame_time / 60.0 * self.bpm * self.mus.get_speed());
+            let start = self.obsts[i].start_time;
+            self.obsts[i].obstacle.update(&mut accum, frame_time, frame_time / 60.0 * self.bpm * self.mus.get_speed(), self.time - start);
             i += 1;
         }
         for obst in &self.obsts {
@@ -334,10 +332,10 @@ impl GameState {
             }
         }
     }
-    pub fn add_obstacle(&mut self, obst: Obst) {
+    pub fn add_obst(&mut self, obst: Obst) {
         self.obsts.push(obst);
     }
-    pub fn add_obst(&mut self, obst: impl Obstacle + 'static) {
-        self.obsts.push(Obst::new(Box::new(obst)))
+    pub fn add_obstacle(&mut self, obst: impl Obstacle + 'static, time: f32) {
+        self.obsts.push(Obst::new(Box::new(obst), time))
     }
 }

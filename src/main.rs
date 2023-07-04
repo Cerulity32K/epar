@@ -1,6 +1,5 @@
 #![feature(unboxed_closures)]
 #![feature(fn_traits)]
-#![feature(box_syntax)]
 
 // Comment out to show all >50 warnings about unused stuff
 #![allow(unused)]

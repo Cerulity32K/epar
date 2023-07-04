@@ -62,10 +62,7 @@ impl Clone for MultiSpawner {
     fn clone(&self) -> Self {
         let mut new_obsts: Vec<Obst> = vec![];
         for i in &self.0 {
-            new_obsts.push(Obst {
-                obstacle: i.obstacle.box_clone(),
-                marked_for_removal: i.marked_for_removal
-            })
+            new_obsts.push(i.clone());
         }
         MultiSpawner(new_obsts)
     }

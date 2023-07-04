@@ -25,10 +25,11 @@ macro_rules! vec2_builder {
 pub struct Obst {
     pub obstacle: Box<dyn Obstacle>,
     pub marked_for_removal: bool,
+    pub start_time: f32
 }
 impl Obst {
-    pub fn new(obst: Box<dyn Obstacle>) -> Self {
-        Obst { obstacle: obst, marked_for_removal: false }
+    pub fn new(obst: Box<dyn Obstacle>, start_time: f32) -> Self {
+        Obst { obstacle: obst, marked_for_removal: false, start_time }
     }
 }
 impl Clone for Obst {
@@ -51,7 +52,7 @@ impl Default for Player {
     }
 }
 pub trait Obstacle {
-    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32);
+    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, relative_time: f32);
     fn draw(&self, color: Color, offset: Vec2);
     fn box_clone(&self) -> Box<dyn Obstacle>;
     fn collides(&self, player: Player) -> bool;
@@ -73,7 +74,7 @@ impl Pellet {
 impl Obstacle for Pellet {
     fn box_clone(&self) -> Box<dyn Obstacle> { Box::new(*self) }
     fn collides(&self, player: Player) -> bool {
-        self.pos.distance_squared(player.pos) <= sq(self.rad + player.rad)
+        collide_cc(self.pos, self.rad, player.pos, player.rad)
     }
     fn draw(&self, color: Color, offset: Vec2) {
         draw_circle(self.pos.x + offset.x, self.pos.y + offset.y, self.rad, color);
@@ -81,7 +82,7 @@ impl Obstacle for Pellet {
     fn should_kill(&mut self) -> bool {
         !Rect::new(-self.rad, -self.rad, screen_width() + self.rad, screen_height() + self.rad).contains(self.pos)
     }
-    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32) {
+    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
         self.pos += self.vel * beat_delta;
     }
 }
@@ -118,7 +119,7 @@ impl Bomb {
             pos: args.pos,
             vel: args.vel,
             rad: args.rad
-        })))
+        }), args.time))
     }
     pub fn pos(&self, offset: Vec2) -> Vec2 {
         (self.start - self.target) / (self.time * self.snappiness + 1.0) + self.target + offset
@@ -133,7 +134,7 @@ impl Clone for Bomb {
     }
 }
 impl Obstacle for Bomb {
-    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32) { self.time += beat_delta; }
+    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) { self.time = time; }
     fn draw(&self, color: Color, offset: Vec2) {
         let pos = self.pos(offset);
         let size = self.time * self.rad;
@@ -156,7 +157,7 @@ impl Obstacle for Bomb {
         let pos = self.pos(Vec2::ZERO);
         for i in 0..self.pellets {
             let period = i as f32 / self.pellets as f32 * TAU;
-            self.spawner.run(to_add, ModifyArgs::new().pos(pos).vel(Vec2 {
+            self.spawner.run(to_add, ModifyArgs::new(to_add.time()).pos(pos).vel(Vec2 {
                 x: period.sin() * self.pellet_vel,
                 y: period.cos() * self.pellet_vel
             }).rad(self.pellet_rad));
@@ -196,10 +197,7 @@ impl GrowLaser {
     }
     builder!(fade_opacity: f32);
     builder!(fade_in: f32);
-    pub fn grow_time(mut self, new_time: f32) -> Self {
-        self.grow_time = new_time;
-        self
-    }
+    builder!(grow_time: f32);
     /// Calculates smoothed thickness
     pub fn thick(&self) -> f32 {
         let total_time = self.warning_time + self.show_time;
@@ -213,8 +211,8 @@ impl GrowLaser {
     }
 }
 impl Obstacle for GrowLaser {
-    fn update(&mut self, accum: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32) {
-        self.current_time += beat_delta;
+    fn update(&mut self, accum: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+        self.current_time = time;
         if !self.shown && self.current_time >= self.warning_time {
             accum.jerk(self.jerk);
             self.shown = true;
@@ -304,8 +302,8 @@ impl SlamLaser {
     }
 }
 impl Obstacle for SlamLaser {
-    fn update(&mut self, accum: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32) {
-        self.current_time += beat_delta;
+    fn update(&mut self, accum: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+        self.current_time = time;
         if !self.shown && self.current_time >= self.warning_time {
             accum.jerk(self.jerk);
             accum.shake(self.shake);
@@ -386,10 +384,10 @@ impl Obstacle for Periodic {
     fn should_kill(&mut self) -> bool {
         self.time_div >= self.max_steps
     }
-    fn update(&mut self, game_state: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32) {
+    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
         self.time_mod += beat_delta;
         while self.time_mod >= self.interval {
-            self.modifier.run(game_state, ModifyArgs::new().step(self.time_div));
+            self.modifier.run(to_add, ModifyArgs::new(to_add.time()).step(self.time_div));
             self.time_mod -= self.interval;
             self.time_div += 1;
         }
@@ -445,8 +443,8 @@ impl Obstacle for RotatableRect {
     fn should_kill(&mut self) -> bool {
         self.current_time >= self.show_time + self.warning_time
     }
-    fn update(&mut self, game_state: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32) {
-        self.current_time += beat_delta;
+    fn update(&mut self, game_state: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+        self.current_time = time;
     }
 }
 
@@ -502,8 +500,8 @@ impl Obstacle for RotatingRect {
     fn should_kill(&mut self) -> bool {
         self.current_time >= self.show_time + self.warning_time
     }
-    fn update(&mut self, game_state: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32) {
-        self.current_time += beat_delta;
+    fn update(&mut self, game_state: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+        self.current_time = time;
     }
 }
 
@@ -540,13 +538,13 @@ impl PelletSpinner {
 pub struct SmokeProj {
     disp_amp: f32,
     disp_freq: f32,
+    disp_phase: f32,
     time: f32,
     rad: f32,
     pulse: f32,
     warning_time: f32,
     show_time: f32,
     leave_time: f32,
-    disp_phase: f32,
     pub events: Vec<(f32, SmokeEvent)>,
     pellet_spinners: Vec<PelletSpinner>
 }
@@ -658,8 +656,8 @@ impl SmokeProj {
     }
 }
 impl Obstacle for SmokeProj {
-    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32) {
-        self.time += beat_delta;
+    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+        self.time = time;
         self.pulse *= 0.975;
         while self.events.len() > 0 {
             if self.time - self.warning_time >= self.events[0].0 {
@@ -683,7 +681,7 @@ impl Obstacle for SmokeProj {
         let pos = self.trackpos(self.time) + offset;
         draw_circle(pos.x, pos.y, self.size(self.time), self.color(color, self.time));
     }
-    fn box_clone(&self) -> Box<dyn Obstacle> { box self.clone() }
+    fn box_clone(&self) -> Box<dyn Obstacle> { Box::new(self.clone()) }
     fn collides(&self, player: Player) -> bool { collide_cc(self.trackpos(self.time), self.size(self.time), player.pos, player.rad) }
     fn should_kill(&mut self) -> bool {
         self.time > self.warning_time + self.show_time
@@ -798,8 +796,8 @@ impl GOLGrid {
     }
 }
 impl Obstacle for GOLGrid {
-    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32) {
-        self.time += beat_delta;
+    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+        self.time = time;
         let first = self.ticks == 0;
         if first || self.time > self.period * self.ticks as f32 + self.first_warning_time - self.warning_time {
             self.tick();
@@ -822,7 +820,9 @@ impl Obstacle for GOLGrid {
         }
     }
     fn draw(&self, color: Color, offset: Vec2) { }
-    fn box_clone(&self) -> Box<dyn Obstacle> { box self.clone() }
+    fn box_clone(&self) -> Box<dyn Obstacle> { Box::new(self.clone()) }
     fn collides(&self, player: Player) -> bool { false }
     fn should_kill(&mut self) -> bool { self.ticks >= self.max }
 }
+
+

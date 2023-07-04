@@ -130,7 +130,7 @@ pub fn draw_rrect(center: Vec2, size: Vec2, rot: f32, color: impl Into<Color>) {
 pub fn centered_text_draw(string: &str, pos: Vec2, font_size: f32, color: Color) {
     let text_dims = measure_text(string, None, font_size as u16, font_size / font_size.floor());
     let text_center = vec2(text_dims.width, text_dims.height) / 2.0;
-    draw_text(string, pos.x + text_center.x, pos.y + text_center.y, font_size, color);
+    draw_text(string, pos.x + text_center.x, pos.y + text_dims.offset_y / 2.0, font_size, color);
 }
 
 pub fn gay(phase: f32) -> Color {
@@ -143,7 +143,7 @@ pub fn gay(phase: f32) -> Color {
 }
 
 pub fn screen_center() -> Vec2 {
-    vec2(screen_width() / 2.0, screen_height() / 2.0)
+    screen_size() / 2.0
 }
 
 pub fn screen_size() -> Vec2 {
