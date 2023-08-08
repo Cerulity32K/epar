@@ -132,3 +132,8 @@ impl Accumulatee for LaserSpawner {
         }
     }
 }
+
+pub struct LaserArray {
+    pub warning_time: f32,
+    
+}

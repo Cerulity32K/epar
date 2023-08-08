@@ -125,6 +125,9 @@ impl<T> Accumulatee for T where T: Fn(&mut UpdateAccumulator, ModifyArgs) + Clon
 
 pub struct GSEvent(pub f32, pub Box<dyn Accumulatee>);
 impl GSEvent {
+    pub fn new(time: f32, ev: impl Accumulatee + 'static) -> Self {
+        GSEvent(time, Box::new(ev))
+    }
     pub fn time(mut self, time: f32) -> Self {
         self.0 = time;
         self
@@ -210,6 +213,12 @@ impl GameState {
     pub fn add_event(&mut self, event: GSEvent) {
         self.events.push(event);
     }
+    pub fn event<T: Accumulatee + 'static>(&mut self, time: f32, event: T) {
+        self.events.push(GSEvent(time, Box::new(event)));
+    }
+    pub fn instantly(&mut self, event: impl Accumulatee + 'static) {
+        self.add_event(GSEvent(f32::NEG_INFINITY, Box::new(event)))
+    }
     pub fn add_events(&mut self, events: impl IntoIterator<Item = GSEvent>) {
         self.events.append(&mut events.into_iter().collect::<Vec<GSEvent>>());
     }
@@ -241,6 +250,7 @@ impl GameState {
         let smargs = ModifyArgs::default();
         let mut accum = UpdateAccumulator::new();
         'event_calls: loop {
+            if self.events.is_empty() { break 'event_calls; }
             let time = self.events[0].0;
             if self.events.len() > 0 && time <= mus_time {
                 let ev = self.events.remove(0);
@@ -267,10 +277,14 @@ impl GameState {
         self.cam_jerk *= 0.8;
         self.cam_shake *= 0.95;
 
+        accum.time = self.time;
+
         let mut i = 0;
         while i < self.obsts.len() {
             let start = self.obsts[i].start_time;
-            self.obsts[i].obstacle.update(&mut accum, frame_time, frame_time / 60.0 * self.bpm * self.mus.get_speed(), self.time - start);
+            let dt = frame_time / 60.0 * self.bpm * self.mus.get_speed();
+            let t = self.time - start;
+            self.obsts[i].obstacle.update(&mut accum, dt, t, dt, t);
             i += 1;
         }
         for obst in &self.obsts {

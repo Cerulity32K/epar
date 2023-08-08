@@ -53,8 +53,8 @@ pub fn collide_cc(pos1: Vec2, rad1: f32, pos2: Vec2, rad2: f32) -> bool {
 
 /// Tests if a hollow circle and a filled circle collide.\
 /// Fast; no division or square roots
-pub fn collide_chc(pos1: Vec2, rad1: f32, thickness: f32, pos2: Vec2, rad2: f32) -> bool {
-    collide_cc(pos1, rad1, pos2, rad2) && !collide_cc(pos1, rad1 - thickness, pos2, -rad2)
+pub fn collide_chc(cpos: Vec2, crad: f32, hpos: Vec2, hrad: f32, hradin: f32) -> bool {
+    collide_cc(cpos, crad, hpos, hrad) && !collide_cc(cpos, -crad, hpos, hradin)
 }
 
 
@@ -234,4 +234,39 @@ pub fn rep_off<T: Copy + Add<Output = T>>(iter: impl IntoIterator<Item = T>, cou
         }
     }
     dst
+}
+
+/// Approaches 1 as x -> inf.\
+/// 1-1/(x+1)
+pub fn recip_ease(t: f32) -> f32 {
+    1.0 - 1.0 / (t + 1.0)
+}
+
+pub fn collide_circ_arc(cpos: Vec2, crad: f32, apos: Vec2, aradout: f32, aradin: f32, ang1: f32, ang2: f32) -> bool {
+    collide_chc(cpos, crad, apos, aradout, aradin) &&
+    rotate_around(cpos, apos, ang1).y >= apos.y - crad &&
+    rotate_around(cpos, apos, ang2).y <= apos.y - crad
+}
+
+pub fn draw_arc(center: Vec2, inner_rad: f32, outer_rad: f32, ang1: f32, ang2: f32, segments: usize, color: impl Into<Color>) {
+    let color = color.into();
+    let angdiff = ang2 - ang1;
+    let seglen = angdiff / segments as f32;
+
+    for i in 0..segments {
+        let p1 = i as f32 * seglen + ang1;
+        let p2 = (i + 1) as f32 * seglen + ang1;
+        
+        let tl = vec2(p1.sin(), p1.cos()) * outer_rad + center;
+        let tr = vec2(p2.sin(), p2.cos()) * outer_rad + center;
+        let bl = vec2(p1.sin(), p1.cos()) * inner_rad + center;
+        let br = vec2(p2.sin(), p2.cos()) * inner_rad + center;
+
+        draw_triangle(tl, tr, br, color);
+        draw_triangle(tl, bl, br, color);
+    }
+}
+
+pub fn gen_sign() -> f32 {
+    gen_range(0, 2) as f32 * 2.0 - 1.0
 }

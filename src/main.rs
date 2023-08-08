@@ -36,6 +36,9 @@ type CanErr = Possibly<()>;
 
 #[macroquad::main("Exclusively Polygons Alonside Rhythms")]
 async fn main() -> CanErr {
+    let start = 0.0;
+    let speed = 1.0;
+
     request_new_screen_size(1600.0, 900.0);
     next_frame().await;
     let sl = Arc::new(Mutex::new(Soloud::new(SoloudFlag::empty(), Backend::Auto, 44100, 1024, 2)?));
@@ -49,7 +52,7 @@ async fn main() -> CanErr {
                 let length = lvls.len();
                 let rect_height = screen_height() / length as f32;
                 let rect_width = screen_width();
-                let rect_padding = 50.0;
+                let rect_padding = 10.0;
                 let pos = mouse_position();
                 let mouse_pos = vec2(pos.0, pos.1);
                 'elit: for (idx, lvl) in lvls.into_iter().enumerate() {
@@ -65,7 +68,7 @@ async fn main() -> CanErr {
                         if is_mouse_button_pressed(MouseButton::Left) {
                             macroquad::rand::srand((get_time() * 1_000_000.0) as u64);
                             state.reset();
-                            state.load_level(lvl, 0.0, 1.0);
+                            state.load_level(lvl, start, speed);
                             state.epar_state = EparState::InGame;
                             break 'elit;
                         }

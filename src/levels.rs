@@ -1,8 +1,8 @@
 use std::f32::{consts::{PI, TAU, FRAC_PI_2}, NEG_INFINITY};
 
-use macroquad::{prelude::{vec2, ORANGE, BLACK, WHITE, Vec2, RED, YELLOW, SKYBLUE, GRAY}, window::{screen_width, screen_height}, rand::gen_range};
+use macroquad::{prelude::{vec2, ORANGE, BLACK, WHITE, Vec2, RED, YELLOW, SKYBLUE, GRAY, Color}, window::{screen_width, screen_height}, rand::gen_range};
 
-use crate::{game::{GameState, GSEvent, UpdateAccumulator, ModifyArgs}, generators::{repeat_periodic, clone_offset, remove}, spawners::{HorLaserSpawner, LaserSpawner, BombSideSpawner}, game_objects::{Obst, Pellet, Periodic, SlamLaser, RotatableRect, Bomb, RotatingRect, SmokeProj, SmokeEvent, Obstacle, GOLGrid, GrowLaser}, utils::{cmul, gay, mix, screen_center, screen_size, rand_vec, floor_vec, screen, tev_rep, ez, repeat_events, rep_off}};
+use crate::{game::{GameState, GSEvent, UpdateAccumulator, ModifyArgs}, generators::{repeat_periodic, clone_offset, remove}, spawners::{HorLaserSpawner, LaserSpawner, BombSideSpawner}, game_objects::{Obst, Pellet, Periodic, SlamLaser, RotatableRect, Bomb, RotatingRect, CenterProj, CenterEvent, Obstacle, GOLGrid, GrowLaser, Ease, SpinningArc}, utils::{cmul, gay, mix, screen_center, screen_size, rand_vec, floor_vec, screen, tev_rep, ez, repeat_events, rep_off, gen_sign}};
 
 /// Function OBstacle Event
 macro_rules! fobe {
@@ -20,27 +20,27 @@ pub fn inferno(state: &mut GameState) -> (f32, f32, &'static str) {
     let drops = 12;
     let padding = 50.0;
 
-    let rain = (0..=drops).map(|i|GSEvent(30.0,
-        Box::new(move |gs: &mut UpdateAccumulator, _|gs.obst(Periodic::new(screen_height() as usize / 32 + 1, 0.125, Periodic::linear(
+    let rain = (0..=drops).map(|i|GSEvent::new(30.0,
+        move |gs: &mut UpdateAccumulator, _|gs.obst(Periodic::new(screen_height() as usize / 32 + 1, 0.125, Periodic::linear(
             2.0, 2.0, 0.25,
             vec2(i as f32 * ((screen_width() - padding * 2.0) / drops as f32) + padding, 0.0), vec2(0.0, 32.0), vec2(30.0, 30.0),
             0.0
-        ))))
+        )))
     )).collect::<Vec<GSEvent>>();
-    let rise = (0..=drops).map(|i|GSEvent(62.0,
-        Box::new(move |gs: &mut UpdateAccumulator, _|gs.obst(Periodic::new(screen_height() as usize / 32 + 3, 0.125, Periodic::linear(
+    let rise = (0..=drops).map(|i|GSEvent::new(62.0,
+        move |gs: &mut UpdateAccumulator, _|gs.obst(Periodic::new(screen_height() as usize / 32 + 3, 0.125, Periodic::linear(
             2.0, 2.0, 0.25,
             vec2(i as f32 * ((screen_width() - padding * 2.0) / drops as f32) + padding, screen_height()), vec2(0.0, -32.0), vec2(30.0, 30.0),
             0.0
-        ))))
+        )))
     )).collect::<Vec<GSEvent>>();
 
-    let slam = vec![GSEvent(26.0, Box::new(|accum: &mut UpdateAccumulator, smargs| {
+    let slam = vec![GSEvent::new(26.0, |accum: &mut UpdateAccumulator, smargs| {
         accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -30.0), vec2(screen_width() / 2.0, screen_height() + 30.0), 100.0, 2.0, 4.0, 0.1, vec2(0.0, 30.0), 0.0))
-    }))];
+    })];
 
     let spiralsurge = [
-        GSEvent(48.5, Box::new(|ac: &mut UpdateAccumulator, _|ac.obst(Periodic::new(400, 0.005, Periodic::rect_trail(
+        GSEvent::new(48.5, |ac: &mut UpdateAccumulator, _|ac.obst(Periodic::new(400, 0.005, Periodic::rect_trail(
             2.0, 2.0, 0.125, |i| {
                 let s = (i as f32).sqrt() * 1.15;
                 let sr = (i as f32 - 1.0).sqrt() * 1.15;
@@ -48,7 +48,7 @@ pub fn inferno(state: &mut GameState) -> (f32, f32, &'static str) {
                 let scent = vec2(screen_width(), screen_height()) / 2.0;
                 (vec2(spi.sin(), spi.cos()) * s * 25.0 + scent, vec2(30.0, 30.0), sr)
             }
-        )))))
+        ))))
     ];
 
     state.clear_events();
@@ -57,11 +57,11 @@ pub fn inferno(state: &mut GameState) -> (f32, f32, &'static str) {
         .chain(remove(clone_offset(&rapid_lasers, 32.0), 47.5, 49.75))
         .chain(clone_offset(&snare_bombs, 32.0))
         .chain(clone_offset(&snare_bombs, 0.0))
-        .chain([GSEvent(4.0, Box::new(|gs: &mut UpdateAccumulator, _|{
+        .chain([GSEvent::new(4.0, |gs: &mut UpdateAccumulator, _|{
             gs.fg(ORANGE);
             gs.bg(cmul(ORANGE, 0.2));
             gs.float(20.0);
-        }))])
+        })])
         .chain(rain)
         .chain(clone_offset(&slam, 32.0))
         .chain(slam)
@@ -77,42 +77,48 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
     let bpm = 177.5;
 
     // Bombs
-    state.add_event(GSEvent(-11.0, Box::new(|accum: &mut UpdateAccumulator, _| {
+    state.add_event(GSEvent::new(-11.0, |accum: &mut UpdateAccumulator, _| {
         accum.obst(Bomb::new(Vec2::ZERO, Vec2::ZERO, 2.0, 50, 200.0, 5.0, Box::new(Bomb::pellet_spawner)));
         accum.obst(Bomb::new(screen_size(), screen_size(), 2.0, 50, 200.0, 5.0, Box::new(Bomb::pellet_spawner)));
         accum.obst(Bomb::new(screen(0.0, 1.0), screen(0.0, 1.0), 2.0, 50, 200.0, 5.0, Box::new(Bomb::pellet_spawner)));
         accum.obst(Bomb::new(screen(1.0, 0.0), screen(1.0, 0.0), 2.0, 50, 200.0, 5.0, Box::new(Bomb::pellet_spawner)));
-    })));
-    state.add_events(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(Bomb::new(vec2(screen_width(), screen_height() / 2.0), vec2(screen_width() - 200.0, screen_height() / 2.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
-    }, 4, -2.0, 1.0));
-    state.add_events(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(Bomb::new(vec2(0.0, screen_height() / 2.0), vec2(200.0, screen_height() / 2.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
-    }, 4, 2.0, 1.0));
-    state.add_events(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(Bomb::new(vec2(screen_width() / 2.0, 0.0), vec2(screen_width() / 2.0, 200.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
-    }, 4, 6.0, 1.0));
-    
-    state.add_events(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(Bomb::new(vec2(screen_width() / 2.0, screen_height()), vec2(screen_width() / 2.0, screen_height() - 200.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
-    }, 4, 10.0, 1.0));
+    }));
+    state.add_events(
+        repeat_periodic(|accum: &mut UpdateAccumulator, _| {
+            accum.obst(Bomb::new(vec2(screen_width(), screen_height() / 2.0), vec2(screen_width() - 200.0, screen_height() / 2.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
+        }, 4, -2.0, 1.0)
 
-    state.add_events(repeat_periodic(BombSideSpawner::new(16, 300.0, 10.0, 2.0), 24, 14.0, 1.0));
+        .into_iter().chain(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
+            accum.obst(Bomb::new(vec2(0.0, screen_height() / 2.0), vec2(200.0, screen_height() / 2.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
+        }, 4, 2.0, 1.0))
+
+        .chain(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
+            accum.obst(Bomb::new(vec2(screen_width() / 2.0, 0.0), vec2(screen_width() / 2.0, 200.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
+        }, 4, 6.0, 1.0))
+
+        .chain(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
+            accum.obst(Bomb::new(vec2(screen_width() / 2.0, screen_height()), vec2(screen_width() / 2.0, screen_height() - 200.0), 2.0, 8, 250.0, 6.0, Box::new(Bomb::pellet_spawner)))
+        }, 4, 10.0, 1.0))
+
+        .chain(repeat_periodic(BombSideSpawner::new(16, 300.0, 10.0, 2.0), 24, 14.0, 1.0))
+    );
 
     // Lasers
     state.add_events(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(gen_range(0.0, screen_width()), -50.0), vec2(gen_range(0.0, screen_width()), screen_height() + 50.0), 25.0, 4.0, 2.0, 0.2, vec2(0.0, 20.0), 0.0));
         accum.obst(SlamLaser::new(vec2(gen_range(0.0, screen_width()), -50.0), vec2(gen_range(0.0, screen_width()), screen_height() + 50.0), 25.0, 4.0, 2.0, 0.2, vec2(0.0, 20.0), 0.0));
     }, 24, 12.0, 1.0));
-    state.add_event(GSEvent(36.0, Box::new(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -50.0), vec2(screen_width() / 2.0, screen_height() + 50.0), 100.0, 4.0, 6.0, 0.2, vec2(0.0, 20.0), 10.0));
-    })));
-    state.add_event(GSEvent(38.0, Box::new(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -50.0), vec2(screen_width() / 2.0, screen_height() + 50.0), 200.0, 4.0, 6.0, 0.2, vec2(-10.0, 20.0), 40.0));
-    })));
-    state.add_event(GSEvent(40.0, Box::new(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -50.0), vec2(screen_width() / 2.0, screen_height() + 50.0), 400.0, 4.0, 6.0, 0.2, vec2(10.0, 20.0), 100.0));
-    })));
+    state.add_events([
+        GSEvent::new(36.0, |accum: &mut UpdateAccumulator, _| {
+            accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -50.0), vec2(screen_width() / 2.0, screen_height() + 50.0), 100.0, 4.0, 6.0, 0.2, vec2(0.0, 20.0), 10.0));
+        }),
+        GSEvent::new(38.0, |accum: &mut UpdateAccumulator, _| {
+            accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -50.0), vec2(screen_width() / 2.0, screen_height() + 50.0), 200.0, 4.0, 6.0, 0.2, vec2(-10.0, 20.0), 40.0));
+        }),
+        GSEvent::new(40.0, |accum: &mut UpdateAccumulator, _| {
+            accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -50.0), vec2(screen_width() / 2.0, screen_height() + 50.0), 400.0, 4.0, 6.0, 0.2, vec2(10.0, 20.0), 100.0));
+        })
+    ]);
     
     let mut quick_slam = repeat_periodic(|accum: &mut UpdateAccumulator, _| {
         accum.obst(SlamLaser::new(vec2(gen_range(0.0, screen_width()), -50.0), vec2(gen_range(0.0, screen_width()), screen_height() + 50.0), 50.0, 4.0, 2.0, 0.2, vec2(0.0, 20.0), 0.0));
@@ -122,33 +128,35 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
     state.add_events(quick_slam);
     state.add_events(repeat_periodic(LaserSpawner::new(2.0, 1.0, 45.0, 30.0), 48, 58.0, 0.25));
 
-    state.add_event(GSEvent(68.0, Box::new(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -250.0), vec2(screen_width() / 2.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
-    })));
-    state.add_event(GSEvent(70.0, Box::new(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(SlamLaser::new(vec2(screen_width() / 2.0 - screen_height() / 2.0 - 250.0, -250.0), vec2(screen_width() / 2.0 + screen_height() / 2.0 + 250.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
-        accum.obst(SlamLaser::new(vec2(screen_width() / 2.0 + screen_height() / 2.0 + 250.0, -250.0), vec2(screen_width() / 2.0 - screen_height() / 2.0 - 250.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
-    })));
-    state.add_event(GSEvent(72.0, Box::new(|accum: &mut UpdateAccumulator, _|accum.fg(RED))));
-    state.add_event(GSEvent(72.0, Box::new(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(SlamLaser::new(vec2(-250.0, screen_height() / 4.0), vec2(screen_width() + 250.0, screen_height() / 4.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
-        accum.obst(SlamLaser::new(vec2(-250.0, screen_height() / 4.0 * 3.0), vec2(screen_width() + 250.0, screen_height() / 4.0 * 3.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
-    })));
-    state.add_event(GSEvent(74.0, Box::new(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(SlamLaser::new(vec2(100.0, -250.0), vec2(100.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
-        accum.obst(SlamLaser::new(vec2(screen_width() - 100.0, -250.0), vec2(screen_width() - 100.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
-        accum.obst(SlamLaser::new(vec2(-250.0, screen_height() / 2.0), vec2(screen_width() + 250.0, screen_height() / 2.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
-    })));
-    state.add_event(GSEvent(76.0, Box::new(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -250.0), vec2(screen_width() / 2.0, screen_height() + 250.0), 400.0, 4.0, 4.0, 0.2, vec2(10.0, 20.0), 150.0).leave_time(1.0));
-    })));
-    state.add_event(GSEvent(80.0, Box::new(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(SlamLaser::new(Vec2::ZERO, screen_size(), 400.0, 4.0, 4.0, 0.2, vec2(10.0, 20.0), 150.0).leave_time(1.0));
-        accum.obst(SlamLaser::new(vec2(screen_width(), 0.0), vec2(0.0, screen_height()), 400.0, 4.0, 4.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
-    })));
-    state.add_event(GSEvent(84.0, Box::new(|accum: &mut UpdateAccumulator, _| {
-        accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -400.0), vec2(screen_width() / 2.0, screen_height() + 400.0), 800.0, 4.0, 16.0, 0.2, vec2(10.0, 20.0), 400.0).leave_time(16.0));
-    })));
+    state.add_events([
+        GSEvent(68.0, Box::new(|accum: &mut UpdateAccumulator, _| {
+            accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -250.0), vec2(screen_width() / 2.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
+        })),
+        GSEvent(70.0, Box::new(|accum: &mut UpdateAccumulator, _| {
+            accum.obst(SlamLaser::new(vec2(screen_width() / 2.0 - screen_height() / 2.0 - 250.0, -250.0), vec2(screen_width() / 2.0 + screen_height() / 2.0 + 250.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
+            accum.obst(SlamLaser::new(vec2(screen_width() / 2.0 + screen_height() / 2.0 + 250.0, -250.0), vec2(screen_width() / 2.0 - screen_height() / 2.0 - 250.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
+        })),
+        GSEvent(72.0, Box::new(|accum: &mut UpdateAccumulator, _|accum.fg(RED))),
+        GSEvent(72.0, Box::new(|accum: &mut UpdateAccumulator, _| {
+            accum.obst(SlamLaser::new(vec2(-250.0, screen_height() / 4.0), vec2(screen_width() + 250.0, screen_height() / 4.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
+            accum.obst(SlamLaser::new(vec2(-250.0, screen_height() / 4.0 * 3.0), vec2(screen_width() + 250.0, screen_height() / 4.0 * 3.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
+        })),
+        GSEvent(74.0, Box::new(|accum: &mut UpdateAccumulator, _| {
+            accum.obst(SlamLaser::new(vec2(100.0, -250.0), vec2(100.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 100.0).leave_time(1.0));
+            accum.obst(SlamLaser::new(vec2(screen_width() - 100.0, -250.0), vec2(screen_width() - 100.0, screen_height() + 250.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
+            accum.obst(SlamLaser::new(vec2(-250.0, screen_height() / 2.0), vec2(screen_width() + 250.0, screen_height() / 2.0), 200.0, 4.0, 1.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
+        })),
+        GSEvent(76.0, Box::new(|accum: &mut UpdateAccumulator, _| {
+            accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -250.0), vec2(screen_width() / 2.0, screen_height() + 250.0), 400.0, 4.0, 4.0, 0.2, vec2(10.0, 20.0), 150.0).leave_time(1.0));
+        })),
+        GSEvent(80.0, Box::new(|accum: &mut UpdateAccumulator, _| {
+            accum.obst(SlamLaser::new(Vec2::ZERO, screen_size(), 400.0, 4.0, 4.0, 0.2, vec2(10.0, 20.0), 150.0).leave_time(1.0));
+            accum.obst(SlamLaser::new(vec2(screen_width(), 0.0), vec2(0.0, screen_height()), 400.0, 4.0, 4.0, 0.2, vec2(10.0, 20.0), 0.0).leave_time(1.0));
+        })),
+        GSEvent(84.0, Box::new(|accum: &mut UpdateAccumulator, _| {
+            accum.obst(SlamLaser::new(vec2(screen_width() / 2.0, -400.0), vec2(screen_width() / 2.0, screen_height() + 400.0), 800.0, 4.0, 16.0, 0.2, vec2(10.0, 20.0), 400.0).leave_time(16.0));
+        }))
+    ]);
 
     // Rotatable rectangles
     state.add_event(GSEvent(8.0, Box::new(|accum: &mut UpdateAccumulator, _| {
@@ -159,6 +167,7 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
             warning_time: 8.0,
             show_time: 24.0,
             current_time: 0.0,
+            ease_time: 0.0,
             grow_time: 1.0,
             rpb: 0.05
         });
@@ -169,6 +178,7 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
             warning_time: 8.0,
             show_time: 24.0,
             current_time: 0.0,
+            ease_time: 0.0,
             grow_time: 1.0,
             rpb: 0.05
         });
@@ -179,6 +189,7 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
             warning_time: 8.0,
             show_time: 24.0,
             current_time: 0.0,
+            ease_time: 0.0,
             grow_time: 1.0,
             rpb: 0.05
         });
@@ -212,34 +223,33 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
     })));
 
     // Color changes
-    state.add_event(GSEvent(16.0, Box::new(|gs: &mut UpdateAccumulator, _| gs.smi(|state: &mut GameState, _| {
-        state.bg_color = Box::new(|f: f32| cmul(gay(f), (-(f) % 1.0 + 1.0) * 0.375 + 0.125));
-        state.fg_color = Box::new(|f: f32| mix(gay(f + FRAC_PI_2), WHITE, 0.5));
-    }))));
-    state.add_event(GSEvent(40.0, Box::new(|gs: &mut UpdateAccumulator, _| gs.smi(|state: &mut GameState, _| {
-        state.bg_color = Box::new(|f: f32| cmul(gay(f), (-(f) % 2.0 + 2.0) * 0.375 / 1.5 + 0.125));
-    }))));
-    state.add_event(GSEvent(46.0, Box::new(|gs: &mut UpdateAccumulator, _| {
-        gs.bg(BLACK);
-        gs.obst(Periodic::new(80, 0.125, Box::new(|accum: &mut UpdateAccumulator, smargs: ModifyArgs| {
-            accum.obst(Pellet::new(vec2(screen_width() / 2.0, screen_height() - smargs.step as f32 * screen_height() / 80.0), vec2((smargs.step as f32).sin(), (smargs.step as f32).cos()) * 150.0, 12.5));
-        })))
-    })));
-    state.add_event(GSEvent(56.0, Box::new(|gs: &mut UpdateAccumulator, _| {
-        gs.smi(|state: &mut GameState, _| {
-            state.fg_color = Box::new(|f: f32| cmul(WHITE, (f * TAU * 2.0).sin() / 4.0 + 0.75));
-        });
-    })));
+    state.add_events([
+        GSEvent::new(16.0, |gs: &mut UpdateAccumulator, _| gs.smi(|state: &mut GameState, _| {
+            state.bg_color = Box::new(|f: f32| cmul(gay(f), (-(f) % 1.0 + 1.0) * 0.375 + 0.125));
+            state.fg_color = Box::new(|f: f32| mix(gay(f + FRAC_PI_2), WHITE, 0.5));
+        })),
+        GSEvent::new(46.0, |gs: &mut UpdateAccumulator, _| {
+            gs.bg(BLACK);
+            gs.obst(Periodic::new(80, 0.125, Box::new(|accum: &mut UpdateAccumulator, smargs: ModifyArgs| {
+                accum.obst(Pellet::new(vec2(screen_width() / 2.0, screen_height() - smargs.step as f32 * screen_height() / 80.0), vec2((smargs.step as f32).sin(), (smargs.step as f32).cos()) * 150.0, 12.5));
+            })))
+        }),
+        GSEvent::new(56.0, |gs: &mut UpdateAccumulator, _| {
+            gs.smi(|state: &mut GameState, _| {
+                state.fg_color = Box::new(|f: f32| cmul(WHITE, (f * TAU * 2.0).sin() / 4.0 + 0.75));
+            });
+        })
+    ]);
 
     (-9.7327210884 * bpm / 60.0, bpm, "./music/moonlight_sonata.mp3")
 }
 
 /// Aperture Science Psychoacoustic Laboratories - Friendly Faith Plate
 pub fn friendly_faith_plate(state: &mut GameState) -> (f32, f32, &'static str) {
-    let bpm = 120.0;
-    state.add_event(GSEvent(NEG_INFINITY, Box::new(|accum: &mut UpdateAccumulator, _| {
+    let bpm: f32 = 120.0;
+    state.instantly(|accum: &mut UpdateAccumulator, _| {
         accum.fg(cmul(WHITE, 0.75));
-    })));
+    });
     state.add_events(vec![].into_iter()
         .chain(rep_off([
             0.0, 0.25, 0.5, 1.0, 1.5, 1.75,
@@ -247,7 +257,7 @@ pub fn friendly_faith_plate(state: &mut GameState) -> (f32, f32, &'static str) {
             4.0, 4.25, 4.5, 4.75, 5.0, 5.25, 5.5, 5.75,
             6.0, 6.25, 6.5, 7.0, 7.25, 7.5
         ], 4, 8.0).into_iter().map(|n|
-            GSEvent(n - 2.0, Box::new(move |accum: &mut UpdateAccumulator, _| {
+            GSEvent::new(n - 2.0, move |accum: &mut UpdateAccumulator, _| {
                 let w = screen_width();
                 for _ in 0..1 {
                     accum.obst(GrowLaser::new(
@@ -257,9 +267,9 @@ pub fn friendly_faith_plate(state: &mut GameState) -> (f32, f32, &'static str) {
                             .grow_time(0.125)
                             .fade_in(0.125)
                             .fade_opacity(0.25)
-                    )
+                    );
                 }
-            }))
+            })
         ))
         .chain(repeat_periodic(|accum: &mut UpdateAccumulator, _| {
             for i in 0..2 {
@@ -285,51 +295,51 @@ pub fn smoke(state: &mut GameState) -> (f32, f32, &'static str) {
 
             let fsp = 300.0;
             let frd = 10.0;
-            accum.obst(SmokeProj::default()
-                .smevs(tev_rep(vec![
-                    (0.0, SmokeEvent::SPulse(20.0)), (0.0, SmokeEvent::Pellets(20, slsp, slrd, 0.0)),
-                    (1.0, SmokeEvent::Pellets(8, slsp, slrd, 0.2)),
-                    (1.5, SmokeEvent::Pellets(4, slsp, slrd, 0.0)),
-                    (1.75, SmokeEvent::SPulse(20.0)), (1.75, SmokeEvent::Pellets(12, slsp, slrd, 0.0)),
-                    (2.5, SmokeEvent::SPulse(20.0)), (2.5, SmokeEvent::Pellets(16, slsp, slrd, 0.0)),
-                    (3.25, SmokeEvent::Pellets(10, slsp, slrd, 0.0)),
+            accum.obst(CenterProj::default()
+                .evs(tev_rep(vec![
+                    (0.0, CenterEvent::SPulse(20.0)), (0.0, CenterEvent::Pellets(20, slsp, slrd, 0.0, true)),
+                    (1.0, CenterEvent::Pellets(8, slsp, slrd, 0.2, false)),
+                    (1.5, CenterEvent::Pellets(4, slsp, slrd, 0.0, false)),
+                    (1.75, CenterEvent::SPulse(20.0)), (1.75, CenterEvent::Pellets(12, slsp, slrd, 0.0, true)),
+                    (2.5, CenterEvent::SPulse(20.0)), (2.5, CenterEvent::Pellets(16, slsp, slrd, 0.0, true)),
+                    (3.25, CenterEvent::Pellets(10, slsp, slrd, 0.0, false)),
                 ], 6, 4.0))
-                .smevs(tev_rep(vec![
-                    (0.5, SmokeEvent::PelletSpinner(16, fsp, frd, 0.0, 32.0)),
+                .evs(tev_rep(vec![
+                    (0.5, CenterEvent::PelletSpinner(16, fsp, frd, 0.0, 32.0)),
                 ], 4, 4.0))
-                .smevs([
-                    (8.25, SmokeEvent::SPulse(20.0)), (8.25, SmokeEvent::Pellets(10, slsp, slrd, 0.5)),
+                .evs([
+                    (8.25, CenterEvent::SPulse(20.0)), (8.25, CenterEvent::Pellets(10, slsp, slrd, 0.5, true)),
 
-                    (12.0, SmokeEvent::Lasers(6, 0.0)),
-                    (12.25, SmokeEvent::Lasers(6, 0.25)),
+                    (12.0, CenterEvent::Lasers(6, 0.0)),
+                    (12.25, CenterEvent::Lasers(6, 0.25)),
 
-                    (24.0, SmokeEvent::Pellets(8, slsp, slrd, 0.0)),
-                    (26.5, SmokeEvent::SPulse(20.0)), (26.5, SmokeEvent::Pellets(16, slsp, slrd, 0.0)),
-                    (27.25, SmokeEvent::Pellets(10, slsp, slrd, 0.0)),
+                    (24.0, CenterEvent::Pellets(8, slsp, slrd, 0.0, false)),
+                    (26.5, CenterEvent::SPulse(20.0)), (26.5, CenterEvent::Pellets(16, slsp, slrd, 0.0, true)),
+                    (27.25, CenterEvent::Pellets(10, slsp, slrd, 0.0, false)),
                 ])
-                .smevs([
-                    (28.0, SmokeEvent::SPulse(20.0)), (28.0, SmokeEvent::Pellets(20, slsp, slrd, 0.0)),
-                    (29.0, SmokeEvent::Pellets(8, slsp, slrd, 0.2)),
-                    (29.5, SmokeEvent::Pellets(4, slsp, slrd, 0.0)),
-                    (29.75, SmokeEvent::SPulse(20.0)), (29.75, SmokeEvent::Pellets(12, slsp, slrd, 0.0)),
-                    (30.5, SmokeEvent::SPulse(20.0)), (30.5, SmokeEvent::Pellets(16, slsp, slrd, 0.0)),
-                    (31.25, SmokeEvent::Pellets(10, slsp, slrd, 0.0)),
+                .evs([
+                    (28.0, CenterEvent::SPulse(20.0)), (28.0, CenterEvent::Pellets(20, slsp, slrd, 0.0, true)),
+                    (29.0, CenterEvent::Pellets(8, slsp, slrd, 0.2, false)),
+                    (29.5, CenterEvent::Pellets(4, slsp, slrd, 0.0, false)),
+                    (29.75, CenterEvent::SPulse(20.0)), (29.75, CenterEvent::Pellets(12, slsp, slrd, 0.0, true)),
+                    (30.5, CenterEvent::SPulse(20.0)), (30.5, CenterEvent::Pellets(16, slsp, slrd, 0.0, true)),
+                    (31.25, CenterEvent::Pellets(10, slsp, slrd, 0.0, false)),
                 ])
-                .smevs(tev_rep(vec![
-                    (15.0,  SmokeEvent::Lasers(4, 0.0 * 7.0 / 24.0)),
-                    (15.25, SmokeEvent::Lasers(4, 1.0 * 7.0 / 24.0)),
-                    (15.5,  SmokeEvent::Lasers(4, 2.0 * 7.0 / 24.0)),
-                    (15.75, SmokeEvent::Lasers(4, 3.0 * 7.0 / 24.0)),
-                    (16.25, SmokeEvent::Lasers(4, 4.0 * 7.0 / 24.0)),
-                    (17.0,  SmokeEvent::Lasers(4, 5.0 * 7.0 / 24.0)),
+                .evs(tev_rep(vec![
+                    (15.0,  CenterEvent::Lasers(4, 0.0 * 7.0 / 24.0)),
+                    (15.25, CenterEvent::Lasers(4, 1.0 * 7.0 / 24.0)),
+                    (15.5,  CenterEvent::Lasers(4, 2.0 * 7.0 / 24.0)),
+                    (15.75, CenterEvent::Lasers(4, 3.0 * 7.0 / 24.0)),
+                    (16.25, CenterEvent::Lasers(4, 4.0 * 7.0 / 24.0)),
+                    (17.0,  CenterEvent::Lasers(4, 5.0 * 7.0 / 24.0)),
 
-                    (19.0,  SmokeEvent::Lasers(3, 0.0 * 2.0 / 21.0)),
-                    (19.25, SmokeEvent::Lasers(3, 1.0 * 2.0 / 21.0)),
-                    (19.5,  SmokeEvent::Lasers(3, 2.0 * 2.0 / 21.0)),
-                    (20.0,  SmokeEvent::Lasers(3, 3.0 * 2.0 / 21.0)),
-                    (20.75, SmokeEvent::Lasers(3, 4.0 * 2.0 / 21.0)),
-                    (21.5,  SmokeEvent::Lasers(3, 5.0 * 2.0 / 21.0)),
-                    (22.25, SmokeEvent::Lasers(3, 6.0 * 2.0 / 21.0)),
+                    (19.0,  CenterEvent::Lasers(3, 0.0 * 2.0 / 21.0)),
+                    (19.25, CenterEvent::Lasers(3, 1.0 * 2.0 / 21.0)),
+                    (19.5,  CenterEvent::Lasers(3, 2.0 * 2.0 / 21.0)),
+                    (20.0,  CenterEvent::Lasers(3, 3.0 * 2.0 / 21.0)),
+                    (20.75, CenterEvent::Lasers(3, 4.0 * 2.0 / 21.0)),
+                    (21.5,  CenterEvent::Lasers(3, 5.0 * 2.0 / 21.0)),
+                    (22.25, CenterEvent::Lasers(3, 6.0 * 2.0 / 21.0)),
                 ], 2, 8.0)).sort()
             );
         })),
@@ -341,30 +351,30 @@ pub fn smoke(state: &mut GameState) -> (f32, f32, &'static str) {
             let fsp = 300.0;
             let frd = 10.0;
             
-            let dual = { SmokeProj::default()
+            let dual = { CenterProj::default()
                 .warning_time(2.0)
                 .disp_amp(150.0)
                 .show_time(18.0)
                 .leave_time(2.0)
-                .smevs(tev_rep(vec![
-                    (0.0, SmokeEvent::Pulse), (0.0, SmokeEvent::Pellets(20, slsp, slrd, 0.0)),
-                    (1.0, SmokeEvent::Pellets(8, slsp, slrd, 0.2)),
-                    (1.5, SmokeEvent::Pellets(4, slsp, slrd, 0.0)),
-                    (1.75, SmokeEvent::Pulse), (1.75, SmokeEvent::Pellets(12, slsp, slrd, 0.0)),
-                    (2.5, SmokeEvent::Pulse), (2.5, SmokeEvent::Pellets(16, slsp, slrd, 0.0)),
-                    (3.25, SmokeEvent::Pellets(10, slsp, slrd, 0.0)),
+                .evs(tev_rep(vec![
+                    (0.0, CenterEvent::Pulse), (0.0, CenterEvent::Pellets(20, slsp, slrd, 0.0, true)),
+                    (1.0, CenterEvent::Pellets(8, slsp, slrd, 0.2, false)),
+                    (1.5, CenterEvent::Pellets(4, slsp, slrd, 0.0, false)),
+                    (1.75, CenterEvent::Pulse), (1.75, CenterEvent::Pellets(12, slsp, slrd, 0.0, true)),
+                    (2.5, CenterEvent::Pulse), (2.5, CenterEvent::Pellets(16, slsp, slrd, 0.0, true)),
+                    (3.25, CenterEvent::Pellets(10, slsp, slrd, 0.0, false)),
                 ], 2, 4.0))
-                .smevs(tev_rep(vec![
-                    (8.0, SmokeEvent::Pellets(20, slsp, slrd, 0.0)),
-                    (9.5, SmokeEvent::Pellets(5, slsp, slrd, 0.0)),
-                    (9.75, SmokeEvent::Pellets(12, slsp, slrd, 0.0)),
-                    (10.5, SmokeEvent::Pellets(16, slsp, slrd, 0.0)),
-                    (11.25, SmokeEvent::Pellets(10, slsp, slrd, 0.0)),
+                .evs(tev_rep(vec![
+                    (8.0, CenterEvent::Pellets(20, slsp, slrd, 0.0, false)),
+                    (9.5, CenterEvent::Pellets(5, slsp, slrd, 0.0, false)),
+                    (9.75, CenterEvent::Pellets(12, slsp, slrd, 0.0, false)),
+                    (10.5, CenterEvent::Pellets(16, slsp, slrd, 0.0, false)),
+                    (11.25, CenterEvent::Pellets(10, slsp, slrd, 0.0, false)),
                 ], 2, 4.0)).sort()
             };
 
             accum.obst(dual.clone());
-            accum.obst(dual.disp_phase(0.5));
+            accum.obst(dual.disp_phase_f32(0.5));
         })),
 
         GSEvent(48.0, Box::new(move |accum: &mut UpdateAccumulator, _| {
@@ -374,52 +384,52 @@ pub fn smoke(state: &mut GameState) -> (f32, f32, &'static str) {
             let fsp = 300.0 * mult;
             let frd = 10.0;
             
-            let triple = { SmokeProj::default()
+            let triple = { CenterProj::default()
                 .warning_time(2.0)
                 .disp_amp(150.0)
-                .disp_freq(mult)
+                .disp_freq_f32(mult)
                 .show_time(40.0)
                 .leave_time(0.5)
-                .smevs(tev_rep(vec![
-                    (0.0, SmokeEvent::Pulse), (0.0, SmokeEvent::Pellets(20, slsp, slrd, 0.0)),
-                    (1.0, SmokeEvent::Pellets(8, slsp, slrd, 0.2)),
-                    (1.5, SmokeEvent::Pellets(4, slsp, slrd, 0.0)),
-                    (1.75, SmokeEvent::Pulse), (1.75, SmokeEvent::Pellets(12, slsp, slrd, 0.0)),
-                    (2.5, SmokeEvent::Pulse), (2.5, SmokeEvent::Pellets(16, slsp, slrd, 0.0)),
-                    (3.25, SmokeEvent::Pellets(10, slsp, slrd, 0.0)),
+                .evs(tev_rep(vec![
+                    (0.0, CenterEvent::Pulse), (0.0, CenterEvent::Pellets(20, slsp, slrd, 0.0, true)),
+                    (1.0, CenterEvent::Pellets(8, slsp, slrd, 0.2, false)),
+                    (1.5, CenterEvent::Pellets(4, slsp, slrd, 0.0, false)),
+                    (1.75, CenterEvent::Pulse), (1.75, CenterEvent::Pellets(12, slsp, slrd, 0.0, true)),
+                    (2.5, CenterEvent::Pulse), (2.5, CenterEvent::Pellets(16, slsp, slrd, 0.0, true)),
+                    (3.25, CenterEvent::Pellets(10, slsp, slrd, 0.0, false)),
                 ], 10, 4.0))
-                .smevs(tev_rep(vec![
-                    (0.5, SmokeEvent::PelletSpinner(16, fsp, frd, 0.0, 32.0)),
+                .evs(tev_rep(vec![
+                    (0.5, CenterEvent::PelletSpinner(16, fsp, frd, 0.0, 32.0)),
                 ], 10, 4.0))
-                .smevs(tev_rep(vec![
-                    (-1.0,  SmokeEvent::Lasers(3, 0.0 * 7.0 / 24.0)),
-                    (-0.75, SmokeEvent::Lasers(3, 1.0 * 7.0 / 24.0)),
-                    (-0.5,  SmokeEvent::Lasers(3, 2.0 * 7.0 / 24.0)),
-                    (-0.25, SmokeEvent::Lasers(3, 3.0 * 7.0 / 24.0)),
-                    (0.25,  SmokeEvent::Lasers(3, 4.0 * 7.0 / 24.0)),
-                    (1.0,   SmokeEvent::Lasers(3, 5.0 * 7.0 / 24.0)),
+                .evs(tev_rep(vec![
+                    (-1.0,  CenterEvent::Lasers(3, 0.0 * 7.0 / 24.0)),
+                    (-0.75, CenterEvent::Lasers(3, 1.0 * 7.0 / 24.0)),
+                    (-0.5,  CenterEvent::Lasers(3, 2.0 * 7.0 / 24.0)),
+                    (-0.25, CenterEvent::Lasers(3, 3.0 * 7.0 / 24.0)),
+                    (0.25,  CenterEvent::Lasers(3, 4.0 * 7.0 / 24.0)),
+                    (1.0,   CenterEvent::Lasers(3, 5.0 * 7.0 / 24.0)),
 
-                    (3.0,  SmokeEvent::Lasers(2, 0.0 * 2.0 / 21.0)),
-                    (3.25, SmokeEvent::Lasers(2, 1.0 * 2.0 / 21.0)),
-                    (3.5,  SmokeEvent::Lasers(2, 2.0 * 2.0 / 21.0)),
-                    (4.0,  SmokeEvent::Lasers(2, 3.0 * 2.0 / 21.0)),
-                    (4.75, SmokeEvent::Lasers(2, 4.0 * 2.0 / 21.0)),
-                    (5.5,  SmokeEvent::Lasers(2, 5.0 * 2.0 / 21.0)),
-                    (6.25, SmokeEvent::Lasers(2, 6.0 * 2.0 / 21.0)),
+                    (3.0,  CenterEvent::Lasers(2, 0.0 * 2.0 / 21.0)),
+                    (3.25, CenterEvent::Lasers(2, 1.0 * 2.0 / 21.0)),
+                    (3.5,  CenterEvent::Lasers(2, 2.0 * 2.0 / 21.0)),
+                    (4.0,  CenterEvent::Lasers(2, 3.0 * 2.0 / 21.0)),
+                    (4.75, CenterEvent::Lasers(2, 4.0 * 2.0 / 21.0)),
+                    (5.5,  CenterEvent::Lasers(2, 5.0 * 2.0 / 21.0)),
+                    (6.25, CenterEvent::Lasers(2, 6.0 * 2.0 / 21.0)),
                 ], 5, 8.0)).sort()
             };
 
             accum.obst(triple.clone());
-            let mut sm2 = triple.clone().disp_phase(1.0 / 3.0);
+            let mut sm2 = triple.clone().disp_phase_f32(1.0 / 3.0);
             for (_, event) in &mut sm2.events {
-                if let SmokeEvent::Lasers(_, phase) = event {
+                if let CenterEvent::Lasers(_, phase) = event {
                     *phase += 1.0 / 6.0;
                 }
             }
             accum.obst(sm2);
-            let mut sm3 = triple.disp_phase(2.0 / 3.0);
+            let mut sm3 = triple.disp_phase_f32(2.0 / 3.0);
             for (_, event) in &mut sm3.events {
-                if let SmokeEvent::Lasers(_, phase) = event {
+                if let CenterEvent::Lasers(_, phase) = event {
                     *phase += 2.0 / 6.0;
                 }
             }
@@ -433,37 +443,37 @@ pub fn smoke(state: &mut GameState) -> (f32, f32, &'static str) {
             let fsp = 300.0;
             let frd = 10.0;
             
-            let single = { SmokeProj::default()
+            let single = { CenterProj::default()
                 .warning_time(2.0)
                 .disp_amp(75.0)
                 .show_time(16.0)
                 .leave_time(0.5)
-                .smevs(tev_rep(vec![
-                    (0.0, SmokeEvent::SPulse(20.0)), (0.0, SmokeEvent::Pellets(20, slsp, slrd, 0.0)), (0.0, SmokeEvent::Pellets(20, slsp / 1.25, slrd, 0.5 / 20.0)),
-                    (1.0, SmokeEvent::Pellets(8, slsp, slrd, 0.2)),
-                    (1.5, SmokeEvent::Pellets(4, slsp, slrd, 0.0)),
-                    (1.75, SmokeEvent::SPulse(20.0)), (1.75, SmokeEvent::Pellets(12, slsp, slrd, 0.0)), (1.75, SmokeEvent::Pellets(12, slsp / 1.25, slrd, 0.5 / 12.0)),
-                    (2.5, SmokeEvent::SPulse(20.0)), (2.5, SmokeEvent::Pellets(16, slsp, slrd, 0.0)), (2.5, SmokeEvent::Pellets(16, slsp / 1.25, slrd, 0.5 / 16.0)),
-                    (3.25, SmokeEvent::Pellets(10, slsp, slrd, 0.0)),
+                .evs(tev_rep(vec![
+                    (0.0, CenterEvent::SPulse(20.0)), (0.0, CenterEvent::Pellets(20, slsp, slrd, 0.0, true)), (0.0, CenterEvent::Pellets(20, slsp / 1.25, slrd, 0.5 / 20.0, true)),
+                    (1.0, CenterEvent::Pellets(8, slsp, slrd, 0.2, false)),
+                    (1.5, CenterEvent::Pellets(4, slsp, slrd, 0.0, false)),
+                    (1.75, CenterEvent::SPulse(20.0)), (1.75, CenterEvent::Pellets(12, slsp, slrd, 0.0, true)), (1.75, CenterEvent::Pellets(12, slsp / 1.25, slrd, 0.5 / 12.0, true)),
+                    (2.5, CenterEvent::SPulse(20.0)), (2.5, CenterEvent::Pellets(16, slsp, slrd, 0.0, true)), (2.5, CenterEvent::Pellets(16, slsp / 1.25, slrd, 0.5 / 16.0, true)),
+                    (3.25, CenterEvent::Pellets(10, slsp, slrd, 0.0, false)),
                 ], 4, 4.0))
-                .smevs(tev_rep(vec![
-                    (0.5, SmokeEvent::PelletSpinner(16, fsp, frd, 0.0, 32.0)),
+                .evs(tev_rep(vec![
+                    (0.5, CenterEvent::PelletSpinner(16, fsp, frd, 0.0, 32.0)),
                 ], 4, 4.0))
-                .smevs(tev_rep(vec![
-                    (-1.0,  SmokeEvent::Lasers(4, 0.0 * 7.0 / 24.0)),
-                    (-0.75, SmokeEvent::Lasers(4, 1.0 * 7.0 / 24.0)),
-                    (-0.5,  SmokeEvent::Lasers(4, 2.0 * 7.0 / 24.0)),
-                    (-0.25, SmokeEvent::Lasers(4, 3.0 * 7.0 / 24.0)),
-                    (0.25,  SmokeEvent::Lasers(4, 4.0 * 7.0 / 24.0)),
-                    (1.0,   SmokeEvent::Lasers(4, 5.0 * 7.0 / 24.0)),
+                .evs(tev_rep(vec![
+                    (-1.0,  CenterEvent::Lasers(4, 0.0 * 7.0 / 24.0)),
+                    (-0.75, CenterEvent::Lasers(4, 1.0 * 7.0 / 24.0)),
+                    (-0.5,  CenterEvent::Lasers(4, 2.0 * 7.0 / 24.0)),
+                    (-0.25, CenterEvent::Lasers(4, 3.0 * 7.0 / 24.0)),
+                    (0.25,  CenterEvent::Lasers(4, 4.0 * 7.0 / 24.0)),
+                    (1.0,   CenterEvent::Lasers(4, 5.0 * 7.0 / 24.0)),
 
-                    (3.0,  SmokeEvent::Lasers(3, 0.0 * 2.0 / 21.0)),
-                    (3.25, SmokeEvent::Lasers(3, 1.0 * 2.0 / 21.0)),
-                    (3.5,  SmokeEvent::Lasers(3, 2.0 * 2.0 / 21.0)),
-                    (4.0,  SmokeEvent::Lasers(3, 3.0 * 2.0 / 21.0)),
-                    (4.75, SmokeEvent::Lasers(3, 4.0 * 2.0 / 21.0)),
-                    (5.5,  SmokeEvent::Lasers(3, 5.0 * 2.0 / 21.0)),
-                    (6.25, SmokeEvent::Lasers(3, 6.0 * 2.0 / 21.0)),
+                    (3.0,  CenterEvent::Lasers(3, 0.0 * 2.0 / 21.0)),
+                    (3.25, CenterEvent::Lasers(3, 1.0 * 2.0 / 21.0)),
+                    (3.5,  CenterEvent::Lasers(3, 2.0 * 2.0 / 21.0)),
+                    (4.0,  CenterEvent::Lasers(3, 3.0 * 2.0 / 21.0)),
+                    (4.75, CenterEvent::Lasers(3, 4.0 * 2.0 / 21.0)),
+                    (5.5,  CenterEvent::Lasers(3, 5.0 * 2.0 / 21.0)),
+                    (6.25, CenterEvent::Lasers(3, 6.0 * 2.0 / 21.0)),
                 ], 2, 8.0)).sort()
             };
 
@@ -501,5 +511,225 @@ pub fn granite(state: &mut GameState) -> (f32, f32, &'static str) {
 /// Nighthawk22 - Isolation (LIMBO Remix)
 pub fn isolation(state: &mut GameState) -> (f32, f32, &'static str) {
     let bpm = 200.0;
-    (0.0, bpm, "music/isolation.mp3")
+    state.instantly(Box::new(|accum: &mut UpdateAccumulator, _| {
+        accum.bg(Color::new(0.0, 0.1, 0.1, 1.0));
+        accum.smi(|gs: &mut GameState, _| {
+            let color1 = Color::new(0.0, 1.0, 0.75, 1.0);
+            let color2 = Color::new(0.0, 0.5, 1.0, 1.0);
+            gs.fg_color = Box::new(move |t| mix(color1, color2, (t / 2.0).sin() / 2.0 + 0.5));
+        });
+    }));
+    state.add_event(GSEvent(-8.0, Box::new(|accum: &mut UpdateAccumulator, _| {
+        let max = 2;
+        for i in 0..max {
+            for (x, y) in [
+                (0.0, 1.0),
+                (1.0, 1.0),
+                (2.0, 1.0),
+                (1.0, 0.0),
+                (1.0, 2.0)
+            ] {
+                accum.obst(
+                    Ease::anon(
+                        RotatingRect::default()
+                            .center(screen_center() * vec2(x, y))
+                            .size(Vec2::new(4000.0, 50.0))
+                            .show_time(32.0)
+                            .warning_time(8.0)
+                            .grow_time(2.0)
+                            .rpb(0.01)
+                            .rot((i as f32 + (x + y) / 2.0) / max as f32 * PI),
+                        |x| ((x - 8.0).abs() + 1.0).log2() * 2.0 * (x - 8.0).signum() + (x - 8.0) + (0.04 * x).powi(6)
+                    )
+                );
+            }
+        }
+    })));
+    (-8.442 * bpm / 60.0, bpm, "music/isolation.mp3")
+}
+
+/// KOCMOC (Albee Remix)
+pub fn kocmoc(state: &mut GameState) -> (f32, f32, &'static str) {
+    let bpm = 95.0;
+
+    state.instantly(Box::new(|accum: &mut UpdateAccumulator, _| {
+        accum.float(20.0);
+        accum.bg(BLACK);
+        accum.fg(GRAY);
+    }));
+
+    state.event(-33.0, |accum: &mut UpdateAccumulator, _| {
+        accum.obst(
+            CenterProj::new()
+                .show_time(32.0)
+                .evs((0..8).map(|i| {
+                    let f = i as f32 * 4.0 + 2.0;
+                    [
+                        (f, CenterEvent::Pulse),
+                        (f, CenterEvent::Pellets(20, 200.0, 20.0, 0.0, false)),
+                        (f, CenterEvent::Pellets(20, 150.0, 20.0, 0.025, false)),
+                    ]
+                }).flatten())
+        );
+    });
+    state.event(-16.0, |accum: &mut UpdateAccumulator, _| {
+        accum.smi(|state: &mut GameState, _| {
+            state.bg_color = Box::new(|t| cmul(RED, (t + 16.0) / 16.0));
+        });
+    });
+    state.event(-1.0, |accum: &mut UpdateAccumulator, _| {
+        accum.bg(BLACK);
+        for i in 0..10 {
+            let rad = i as f32 * 50.0;
+            let sign = (i % 2) as f32 * 2.0 - 1.0;
+            let rot_off = gen_range(0.0, TAU);
+            accum.obst(
+                SpinningArc::new()
+                    .center(screen_center())
+                    .inner_rad(rad + 600.0)
+                    .outer_rad(rad + 640.0)
+                    .rpb(gen_range(0.75, 1.25) * sign)
+                    .left_angle(-PI)
+                    .right_angle(FRAC_PI_2)
+                    .show_time(32.0)
+                    .warning_time(1.0)
+            );
+        }
+        accum.obst(
+            CenterProj::new()
+                .show_time(32.0)
+                .disp_amp(200.0)
+                .evs((0..8).map(|i| {
+                    let f = i as f32 * 4.0;
+                    [
+                        (f, CenterEvent::SPulse(40.0)),
+                        (f - 1.0, CenterEvent::Lasers(16, f / TAU)),
+                        (f + 2.0, CenterEvent::MessyPellets(100, 10.0, 100.0, 400.0)),
+                        (f + 2.0, CenterEvent::SPulse(60.0))
+                    ]
+                }).flatten()).sort()
+        );
+    });
+    state.event(0.0, |accum: &mut UpdateAccumulator, _| {
+        accum.float(50.0);
+        accum.smi(|state: &mut GameState, _| {
+            state.fg_color = Box::new(|t| mix(
+                Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
+                Color { r: 0.5, g: 0.5, b: 1.0, a: 1.0 },
+                (t * 20.0).sin() * 0.5 + 0.5
+            ));
+            state.bg_color = Box::new(|t| mix(
+                Color { r: 0.2, g: 0.1, b: 0.1, a: 1.0 },
+                Color { r: 0.2, g: 0.1, b: 0.2, a: 1.0 },
+                (t * 20.0).sin() * 0.5 + 0.5
+            ));
+        });
+    });
+    state.event(31.0, |accum: &mut UpdateAccumulator, _| {
+        for i in 0..11 {
+            let rad = i as f32 * 25.0;
+            let sign = (i % 2) as f32 * 2.0 - 1.0;
+            let rot_off = gen_range(0.0, TAU);
+            accum.obst(
+                SpinningArc::new()
+                    .center(screen_center())
+                    .inner_rad(rad + 600.0)
+                    .outer_rad(rad + 620.0)
+                    .rpb(gen_range(0.75, 1.25) * sign)
+                    .left_angle(-PI)
+                    .right_angle(FRAC_PI_2)
+                    .show_time(32.0)
+                    .warning_time(1.0)
+            );
+        }
+        let proj = CenterProj::new()
+                .show_time(32.0)
+                .disp_amp(300.0)
+                .disp_freq_f32(2.0)
+                .evs((0..8).map(|i| {
+                    let f = i as f32 * 4.0;
+                    [
+                        (f, CenterEvent::SPulse(15.0)),
+                        (f - 1.0, CenterEvent::Lasers(5, f / TAU)),
+
+                        (f + 1.5, CenterEvent::SPulse(15.0)),
+                        (f + 0.5, CenterEvent::Lasers(5, (f + 1.0) / TAU)),
+
+                        (f + 2.5, CenterEvent::SPulse(15.0)),
+                        (f + 1.5, CenterEvent::Lasers(5, (f + 2.0) / TAU)),
+
+                        (f + 3.25, CenterEvent::SPulse(15.0)),
+                        (f + 2.25, CenterEvent::Lasers(5, (f + 3.0) / TAU)),
+
+                        (f + 1.0, CenterEvent::MessyPellets(50, 10.0, 250.0, 400.0)),
+                        (f + 1.0, CenterEvent::SPulse(20.0)),
+
+                        (f + 3.0, CenterEvent::MessyPellets(50, 10.0, 250.0, 400.0)),
+                        (f + 3.0, CenterEvent::SPulse(20.0)),
+                    ]
+                }).flatten()).sort();
+                accum.obst(proj.clone().disp_phase_f32(0.5));
+                accum.obst(proj.clone());
+    });
+    state.event(32.0, |accum: &mut UpdateAccumulator, _| {
+        accum.bg(BLACK);
+
+        accum.smi(|state: &mut GameState, _| {
+            state.bg_color = Box::new(|t| cmul(mix(
+                Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
+                Color { r: 0.5, g: 0.5, b: 1.0, a: 1.0 },
+                (t * 20.0).sin() * 0.5 + 0.5
+            ), 1.0));
+            state.fg_color = Box::new(|t| cmul(mix(
+                Color { r: 1.0, g: 0.5, b: 0.5, a: 1.0 },
+                Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
+                (t * 20.0).sin() * 0.5 + 0.5
+            ), 0.25));
+        });
+    });
+    state.event(62.0, |accum: &mut UpdateAccumulator, _| {
+        accum.obst(
+            CenterProj::new()
+                .disp_freq_f32(0.5)
+                .evs((0..7).map(|i|[
+                    (i as f32 * 4.0, CenterEvent::PelletSpinner(16, 75.0, 10.0, 0.0, 4.0)),
+                    (i as f32 * 4.0, CenterEvent::PelletSpinner(16, 75.0, 10.0, 0.25, 4.0)),
+                    (i as f32 * 4.0, CenterEvent::PelletSpinner(16, 75.0, 10.0, 0.5, 4.0)),
+                    (i as f32 * 4.0, CenterEvent::PelletSpinner(16, 75.0, 10.0, 0.75, 4.0)),
+                ]).flatten())
+                .evs([
+                    (28.0, CenterEvent::PelletSpinner(8, 75.0, 10.0, 0.0, 4.0)),
+                    (28.0, CenterEvent::PelletSpinner(8, 75.0, 10.0, 0.25, 4.0)),
+                    (28.0, CenterEvent::PelletSpinner(8, 75.0, 10.0, 0.5, 4.0)),
+                    (28.0, CenterEvent::PelletSpinner(8, 75.0, 10.0, 0.75, 4.0)),
+                    (30.0, CenterEvent::Pellets(16, 100.0, 20.0, 0.0, true)),
+                    (30.0, CenterEvent::SPulse(10.0)),
+                ])
+                .leave_time(2.0)
+                .warning_time(2.0)
+                .show_time(32.0)
+        );
+    });
+    state.event(64.0, |accum: &mut UpdateAccumulator, _| {
+        accum.float(20.0);
+        accum.smi(|state: &mut GameState, _| {
+            state.fg_color = Box::new(|t| mix(
+                Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
+                Color { r: 0.5, g: 0.5, b: 1.0, a: 1.0 },
+                (t * 2.0).sin() * 0.5 + 0.5
+            ));
+            state.bg_color = Box::new(|t| mix(
+                Color { r: 0.2, g: 0.1, b: 0.1, a: 1.0 },
+                Color { r: 0.2, g: 0.1, b: 0.2, a: 1.0 },
+                (t * 2.0).sin() * 0.5 + 0.5
+            ));
+        });
+    });
+
+    (-21.294 * bpm / 60.0, bpm, "music/kocmoc2.mp3")
+}
+pub fn sparkler(state: &mut GameState) -> (f32, f32, &'static str) {
+    let bpm = 108.5;
+    
+    (-17.886 * bpm / 60.0, bpm, "music/sparkler.mp3")
 }

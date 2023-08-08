@@ -123,6 +123,7 @@ name = "exclusively_polygons_alongside_rhythms"
 version = "0.1.0"
 dependencies = [
  "macroquad",
+ "paste",
  "perlin2d",
  "rand",
  "soloud",
@@ -349,9 +350,9 @@ checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
 
 [[package]]
 name = "paste"
-version = "1.0.12"
+version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f746c4065a8fa3fe23974dd82f15431cc8d40779821001404d10d2e79ca7d79"
+checksum = "b4b27ab7be369122c218afc2079489cdcb4b517c0a3fc386ff11e1fedfcc2b35"
 
 [[package]]
 name = "perlin2d"

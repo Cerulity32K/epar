@@ -1,10 +1,11 @@
 use std::f32::consts::TAU;
 
 use macroquad::{prelude::{Vec2, Rect, Color, WHITE, vec2}, shapes::{draw_circle, draw_line, draw_triangle}, window::{screen_height, screen_width}, rand::gen_range};
+use paste::paste;
 use perlin2d::PerlinNoise2D;
 use rand::{seq::SliceRandom, thread_rng};
 
-use crate::{utils::{sq, self, collide_cr, mix, draw_rrect, collide_cc, screen_center, acmul, circ_climb, adjust, screen_size}, game::{Accumulatee, ModifyArgs, UpdateAccumulator}};
+use crate::{utils::{sq, self, collide_cr, mix, draw_rrect, collide_cc, screen_center, acmul, circ_climb, adjust, screen_size, recip_ease, collide_circ_arc, draw_arc, cmul}, game::{Accumulatee, ModifyArgs, UpdateAccumulator}};
 
 use super::game::GameState;
 
@@ -52,7 +53,15 @@ impl Default for Player {
     }
 }
 pub trait Obstacle {
-    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, relative_time: f32);
+    /// `dease` and `ease` are used for easing.
+    /// 
+    /// If an `Obst` only contains an `Obstacle` like a `Pellet`, `dease == dtime && ease == time`.\
+    /// However, projectiles that contain projectiles can modify `dease` and `ease` (such as `Ease`).
+    /// 
+    /// This discrepancy is important. If you want an object that has custom rotation/path easing,\
+    /// the timing must stay the same. Therefore, `dtime` and `time` are used for timing, while\
+    /// `dease` and `ease` are used for movement.
+    fn update(&mut self, to_add: &mut UpdateAccumulator, dtime: f32, time: f32, dease: f32, ease: f32);
     fn draw(&self, color: Color, offset: Vec2);
     fn box_clone(&self) -> Box<dyn Obstacle>;
     fn collides(&self, player: Player) -> bool;
@@ -82,8 +91,8 @@ impl Obstacle for Pellet {
     fn should_kill(&mut self) -> bool {
         !Rect::new(-self.rad, -self.rad, screen_width() + self.rad, screen_height() + self.rad).contains(self.pos)
     }
-    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
-        self.pos += self.vel * beat_delta;
+    fn update(&mut self, to_add: &mut UpdateAccumulator, beat_delta: f32, time: f32, dease: f32, ease: f32) {
+        self.pos += self.vel * dease;
     }
 }
 
@@ -134,7 +143,7 @@ impl Clone for Bomb {
     }
 }
 impl Obstacle for Bomb {
-    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) { self.time = time; }
+    fn update(&mut self, to_add: &mut UpdateAccumulator, beat_delta: f32, time: f32, dease: f32, ease: f32) { self.time = time; }
     fn draw(&self, color: Color, offset: Vec2) {
         let pos = self.pos(offset);
         let size = self.time * self.rad;
@@ -211,7 +220,7 @@ impl GrowLaser {
     }
 }
 impl Obstacle for GrowLaser {
-    fn update(&mut self, accum: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+    fn update(&mut self, accum: &mut UpdateAccumulator, beat_delta: f32, time: f32, dease: f32, ease: f32) {
         self.current_time = time;
         if !self.shown && self.current_time >= self.warning_time {
             accum.jerk(self.jerk);
@@ -302,7 +311,7 @@ impl SlamLaser {
     }
 }
 impl Obstacle for SlamLaser {
-    fn update(&mut self, accum: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+    fn update(&mut self, accum: &mut UpdateAccumulator, beat_delta: f32, time: f32, dease: f32, ease: f32) {
         self.current_time = time;
         if !self.shown && self.current_time >= self.warning_time {
             accum.jerk(self.jerk);
@@ -384,7 +393,7 @@ impl Obstacle for Periodic {
     fn should_kill(&mut self) -> bool {
         self.time_div >= self.max_steps
     }
-    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+    fn update(&mut self, to_add: &mut UpdateAccumulator, beat_delta: f32, time: f32, dease: f32, ease: f32) {
         self.time_mod += beat_delta;
         while self.time_mod >= self.interval {
             self.modifier.run(to_add, ModifyArgs::new(to_add.time()).step(self.time_div));
@@ -443,7 +452,7 @@ impl Obstacle for RotatableRect {
     fn should_kill(&mut self) -> bool {
         self.current_time >= self.show_time + self.warning_time
     }
-    fn update(&mut self, game_state: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+    fn update(&mut self, game_state: &mut UpdateAccumulator, beat_delta: f32, time: f32, dease: f32, ease: f32) {
         self.current_time = time;
     }
 }
@@ -456,13 +465,36 @@ pub struct RotatingRect {
     pub warning_time: f32,
     pub show_time: f32,
     pub current_time: f32,
+    pub ease_time: f32,
     pub grow_time: f32,
     pub rpb: f32,
 }
+impl Default for RotatingRect {
+    fn default() -> Self {
+        RotatingRect {
+            center: screen_center(),
+            size: Vec2::ZERO,
+            rot: 0.0,
+            warning_time: 8.0,
+            show_time: 0.0,
+            current_time: 0.0,
+            ease_time: 0.0,
+            grow_time: 0.25,
+            rpb: 0.25
+        }
+    }
+}
 impl RotatingRect {
+    builder!(center: Vec2);
+    builder!(size: Vec2);
+    builder!(rot: f32);
+    builder!(warning_time: f32);
+    builder!(show_time: f32);
+    builder!(grow_time: f32);
+    builder!(rpb: f32);
     /// Calculates the animated size\
     /// `allow_oversize` specifies whether or not the size can overshoot `self.size`.
-    pub fn size(&self) -> Vec2 {
+    pub fn get_size(&self) -> Vec2 {
         let total_time = self.warning_time + self.show_time;
         if self.current_time >= total_time - self.grow_time {
             self.size * ((self.current_time - total_time - self.grow_time) / -self.grow_time - 1.0)
@@ -479,8 +511,8 @@ impl RotatingRect {
         }
     }
     /// Starts showing at `rot` radians, spins at `rps` revolutions per second.
-    pub fn rot(&self) -> f32 {
-        self.rot + (self.current_time - self.warning_time) * self.rpb * TAU
+    pub fn get_rot(&self) -> f32 {
+        self.rot + (self.ease_time - self.warning_time) * self.rpb * TAU
     }
 }
 impl Obstacle for RotatingRect {
@@ -488,20 +520,21 @@ impl Obstacle for RotatingRect {
         Box::new(self.clone())
     }
     fn collides(&self, player: Player) -> bool {
-        self.current_time >= self.warning_time && collide_cr(self.center, self.size(), -self.rot(), player.pos, player.rad)
+        self.current_time >= self.warning_time && collide_cr(self.center, self.get_size(), -self.get_rot(), player.pos, player.rad)
     }
     fn draw(&self, mut color: Color, offset: Vec2) {
         color = self.color(color);
         if self.current_time < self.warning_time {
             color.a = self.current_time / self.warning_time * 0.5;
         }
-        draw_rrect(self.center + offset, self.size(), self.rot(), color)
+        draw_rrect(self.center + offset, self.get_size(), self.get_rot(), color)
     }
     fn should_kill(&mut self) -> bool {
         self.current_time >= self.show_time + self.warning_time
     }
-    fn update(&mut self, game_state: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+    fn update(&mut self, game_state: &mut UpdateAccumulator, beat_delta: f32, time: f32, dease: f32, ease: f32) {
         self.current_time = time;
+        self.ease_time = ease;
     }
 }
 
@@ -535,38 +568,40 @@ impl PelletSpinner {
 }
 
 #[derive(Clone)]
-pub struct SmokeProj {
+pub struct CenterProj {
     disp_amp: f32,
-    disp_freq: f32,
-    disp_phase: f32,
+    disp_freq: Vec2,
+    disp_phase: Vec2,
     time: f32,
+    ease: f32,
     rad: f32,
     pulse: f32,
     warning_time: f32,
     show_time: f32,
     leave_time: f32,
-    pub events: Vec<(f32, SmokeEvent)>,
+    pub events: Vec<(f32, CenterEvent)>,
     pellet_spinners: Vec<PelletSpinner>
 }
-impl Default for SmokeProj {
+impl Default for CenterProj {
     fn default() -> Self {
-        SmokeProj {
+        CenterProj {
             disp_amp: 75.0,
-            disp_freq: 1.0,
+            disp_freq: Vec2::ONE,
             time: 0.0,
+            ease: 0.0,
             rad: 20.0,
             pulse: 0.0,
             warning_time: 1.0,
             show_time: 32.0,
             leave_time: 0.25,
             events: vec![],
-            disp_phase: 0.0,
+            disp_phase: Vec2::ZERO,
             pellet_spinners: vec![]
         }
     }
 }
-impl SmokeProj {
-    pub fn new() -> SmokeProj {
+impl CenterProj {
+    pub fn new() -> CenterProj {
         Self::default()
     }
     pub fn trackpos(&self, time: f32) -> Vec2 {
@@ -574,21 +609,23 @@ impl SmokeProj {
         // Perlin construction does zero extra logic; inexpensive
         let perlin = PerlinNoise2D::new(5, 2.0, 1.0, 0.5, 1.2, (1.0, 1.0), 0.0, 0);
         (vec2(
-            perlin.get_noise((time * self.disp_freq) as f64, (time * self.disp_freq) as f64) as f32,
-            perlin.get_noise(-(time * self.disp_freq) as f64, -(time * self.disp_freq) as f64) as f32
+            perlin.get_noise((time * self.disp_freq.x) as f64, (time * self.disp_freq.x) as f64) as f32,
+            perlin.get_noise(-(time * self.disp_freq.y) as f64, -(time * self.disp_freq.y) as f64) as f32
         ) * 0.5 + vec2(
-            (time * 1.25 * self.disp_freq + self.disp_phase * TAU).sin(),
-            (time * 1.25 * self.disp_freq + self.disp_phase * TAU).cos()
+            (time * 1.25 * self.disp_freq.x + self.disp_phase.x * TAU).sin(),
+            (time * 1.25 * self.disp_freq.y + self.disp_phase.y * TAU).cos()
         )
         ) * self.disp_amp + screen_center()
     }
     builder!(disp_amp: f32);
-    builder!(disp_freq: f32);
-    builder!(disp_phase: f32);
+    builder!(disp_freq: Vec2);
+    pub fn disp_freq_f32(mut self, val: f32) -> Self { self.disp_freq = vec2(val, val); self }
+    builder!(disp_phase: Vec2);
+    pub fn disp_phase_f32(mut self, val: f32) -> Self { self.disp_phase = vec2(val, val); self }
     builder!(leave_time: f32);
     builder!(warning_time: f32);
     builder!(show_time: f32);
-    pub fn smevs(mut self, mut events: impl IntoIterator<Item = (f32, SmokeEvent)>) -> Self {
+    pub fn evs(mut self, mut events: impl IntoIterator<Item = (f32, CenterEvent)>) -> Self {
         for i in events.into_iter() {
             self.events.push(i);
         }
@@ -612,13 +649,13 @@ impl SmokeProj {
         self.events.sort_by(|(a, _), (b, _)|a.total_cmp(b));
         self
     }
-    pub fn employ(&mut self, event: SmokeEvent, to_add: &mut UpdateAccumulator) {
+    pub fn employ(&mut self, event: CenterEvent, to_add: &mut UpdateAccumulator) {
         match event {
-            SmokeEvent::Pulse => {
+            CenterEvent::Pulse => {
                 self.pulse = 1.0;
                 to_add.shake(10.0);
             },
-            SmokeEvent::Lasers(count, phase) => {
+            CenterEvent::Lasers(count, phase) => {
                 let start = self.trackpos(self.time + 1.0);
                 for i in 0..count {
                     to_add.obst(SlamLaser::new(start, start + vec2(
@@ -627,17 +664,24 @@ impl SmokeProj {
                     ) * 1250.0, 20.0, 1.0, 1.0, 0.05, Vec2::ZERO, 0.0).leave_time(0.5))
                 }
             },
-            SmokeEvent::Pellets(count, speed, rad, phase) => {
+            CenterEvent::Pellets(count, speed, rad, phase, is_strong) => {
                 let start = self.trackpos(self.time);
                 for i in 0..count {
                     let circ = vec2(
                         ((i as f32 / count as f32 + phase) * TAU).cos(),
                         ((i as f32 / count as f32 + phase) * TAU).sin(),
                     );
-                    to_add.obst(Pellet::new(start + circ * (self.rad - rad), circ * speed, rad))
+                    if is_strong {
+                        to_add.obst(Ease::anon(
+                            Pellet::new(start + circ * (self.rad - rad), circ * speed, rad),
+                            |t| recip_ease(t * 3.0) + t
+                        ))
+                    } else {
+                        to_add.obst(Pellet::new(start + circ * (self.rad - rad), circ * speed, rad))
+                    }
                 }
             },
-            SmokeEvent::PelletSpinner(count, speed, rad, phase, ppb) => {
+            CenterEvent::PelletSpinner(count, speed, rad, phase, ppb) => {
                 self.pellet_spinners.push(PelletSpinner {
                     count: 0,
                     max: count,
@@ -648,16 +692,26 @@ impl SmokeProj {
                     speed
                 })
             },
-            SmokeEvent::SPulse(strength) => {
+            CenterEvent::SPulse(strength) => {
                 self.pulse = 1.0;
                 to_add.shake(strength);
+            },
+            CenterEvent::MessyPellets(count, rad, min_speed, max_speed) => {
+                let pos = self.trackpos(self.time);
+                for i in 0..count {
+                    let speed = gen_range(min_speed, max_speed);
+                    let period = gen_range(0.0, TAU);
+                    let vel = vec2(period.sin(), period.cos()) * speed;
+                    to_add.obst(Pellet::new(pos, vel, rad));
+                }
             }
         }
     }
 }
-impl Obstacle for SmokeProj {
-    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+impl Obstacle for CenterProj {
+    fn update(&mut self, to_add: &mut UpdateAccumulator, beat_delta: f32, time: f32, dease: f32, ease: f32) {
         self.time = time;
+        self.ease = ease;
         self.pulse *= 0.975;
         while self.events.len() > 0 {
             if self.time - self.warning_time >= self.events[0].0 {
@@ -668,7 +722,7 @@ impl Obstacle for SmokeProj {
             }
         }
         let mut i = 0;
-        let pos = self.trackpos(self.time);
+        let pos = self.trackpos(self.ease);
         while i < self.pellet_spinners.len() {
             if self.pellet_spinners[i].run(self.time, pos, self.rad, to_add) {
                 self.pellet_spinners.remove(i);
@@ -678,24 +732,26 @@ impl Obstacle for SmokeProj {
         }
     }
     fn draw(&self, color: Color, offset: Vec2) {
-        let pos = self.trackpos(self.time) + offset;
+        let pos = self.trackpos(self.ease) + offset;
         draw_circle(pos.x, pos.y, self.size(self.time), self.color(color, self.time));
     }
     fn box_clone(&self) -> Box<dyn Obstacle> { Box::new(self.clone()) }
-    fn collides(&self, player: Player) -> bool { collide_cc(self.trackpos(self.time), self.size(self.time), player.pos, player.rad) }
+    fn collides(&self, player: Player) -> bool { collide_cc(self.trackpos(self.ease), self.size(self.time), player.pos, player.rad) }
     fn should_kill(&mut self) -> bool {
         self.time > self.warning_time + self.show_time
     }
 }
 #[derive(Clone, Copy)]
-pub enum SmokeEvent {
+pub enum CenterEvent {
     Pulse,
     /// pulse strength
     SPulse(f32),
     /// count, phase
     Lasers(usize, f32),
-    /// count, speed, rad, phase
-    Pellets(usize, f32, f32, f32),
+    /// count, speed, rad, phase, is_strong
+    Pellets(usize, f32, f32, f32, bool),
+    /// count, rad, min_speed, max_speed,
+    MessyPellets(usize, f32, f32, f32),
     /// count, speed, rad, phase, ppb
     PelletSpinner(usize, f32, f32, f32, f32)
 }
@@ -796,7 +852,7 @@ impl GOLGrid {
     }
 }
 impl Obstacle for GOLGrid {
-    fn update(&mut self, to_add: &mut UpdateAccumulator, frame_time: f32, beat_delta: f32, time: f32) {
+    fn update(&mut self, to_add: &mut UpdateAccumulator, beat_delta: f32, time: f32, dease: f32, ease: f32) {
         self.time = time;
         let first = self.ticks == 0;
         if first || self.time > self.period * self.ticks as f32 + self.first_warning_time - self.warning_time {
@@ -825,4 +881,129 @@ impl Obstacle for GOLGrid {
     fn should_kill(&mut self) -> bool { self.ticks >= self.max }
 }
 
+pub trait Easing {
+    fn box_clone(&self) -> Box<dyn Easing>;
+    fn run(&self, time: f32) -> f32;
+}
+impl<T: Fn(f32) -> f32 + Clone + 'static> Easing for T {
+    fn box_clone(&self) -> Box<dyn Easing> { Box::new(self.clone()) }
+    fn run(&self, time: f32) -> f32 { self(time) } 
+}
 
+pub struct Ease {
+    pub ease: Box<dyn Easing>,
+    pub proj: Box<dyn Obstacle>,
+    pub prev: f32
+}
+macro_rules! ease {
+    ($name:ident, $arg:tt => $impl:block) => {
+        paste! {
+            pub fn [<$name _ease>]($arg: f32) -> f32 {
+                $impl
+            }
+            pub fn $name(proj: impl Obstacle + 'static) -> Self {
+                Ease {
+                    ease: Box::new(Self::[<$name _ease>]),
+                    proj: Box::new(proj),
+                    prev: 0.0
+                }
+            }
+        }
+    };
+}
+impl Ease {
+    ease!(sqrt, t => { t.sqrt() });
+    ease!(quad, t => { t * t });
+    ease!(quant16th, t => { (t * 4.0).floor() * 0.25 });
+    pub fn anon(proj: impl Obstacle + 'static, f: impl Fn(f32) -> f32 + Clone + 'static) -> Self {
+        Ease {
+            ease: Box::new(f),
+            proj: Box::new(proj),
+            prev: 0.0
+        }
+    }
+}
+impl Clone for Ease {
+    fn clone(&self) -> Self {
+        Ease {
+            ease: self.ease.box_clone(),
+            proj: self.proj.box_clone(),
+            prev: self.prev
+        }
+    }
+}
+impl Obstacle for Ease {
+    fn box_clone(&self) -> Box<dyn Obstacle> { Box::new(self.clone()) }
+    fn collides(&self, player: Player) -> bool { self.proj.collides(player) }
+    fn draw(&self, color: Color, offset: Vec2) { self.proj.draw(color, offset) }
+    fn kill(&mut self, to_add: &mut UpdateAccumulator) { self.proj.kill(to_add) }
+    fn should_kill(&mut self) -> bool { self.proj.should_kill() }
+    fn update(&mut self, to_add: &mut UpdateAccumulator, beat_delta: f32, relative_time: f32, dease: f32, ease: f32) {
+        let time = self.ease.run(ease);
+        let de = time - self.prev;
+        self.prev = time;
+        self.proj.update(to_add, beat_delta, relative_time, de, time);
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+pub struct SpinningArc {
+    pub center: Vec2,
+    pub inner_rad: f32,
+    pub outer_rad: f32,
+    pub left_angle: f32,
+    pub right_angle: f32,
+    pub rpb: f32,
+    pub warning_time: f32,
+    pub show_time: f32,
+    pub ease: f32,
+
+    pub time: f32,
+}
+impl SpinningArc {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn rot(&self) -> f32 {
+        self.ease * self.rpb * TAU
+    }
+    pub fn color(&self, color: Color) -> Color {
+        if self.time < self.warning_time {
+            cmul(color, self.time / self.warning_time)
+        } else if (0.0..1.0).contains(&(self.time - self.warning_time)) {
+            mix(WHITE, color, self.time - self.warning_time)
+        } else {
+            color
+        }
+    }
+    builder!(center: Vec2);
+    builder!(inner_rad: f32);
+    builder!(outer_rad: f32);
+    builder!(left_angle: f32);
+    builder!(right_angle: f32);
+    builder!(rpb: f32);
+    builder!(warning_time: f32);
+    builder!(show_time: f32);
+}
+impl Obstacle for SpinningArc {
+    fn update(&mut self, to_add: &mut UpdateAccumulator, beat_delta: f32, relative_time: f32, dease: f32, ease: f32) {
+        self.time = relative_time;
+        self.ease = ease;
+    }
+
+    fn draw(&self, color: Color, offset: Vec2) {
+        draw_arc(self.center + offset, self.inner_rad, self.outer_rad, self.left_angle + self.rot(), self.right_angle + self.rot(), 32, self.color(color))
+    }
+
+    fn box_clone(&self) -> Box<dyn Obstacle> {
+        Box::new(self.clone())
+    }
+
+    fn collides(&self, player: Player) -> bool {
+        collide_circ_arc(player.pos, player.rad, self.center, self.outer_rad, self.inner_rad, -self.rot(), self.right_angle - self.rot() - self.left_angle) && self.time >= self.warning_time
+    }
+
+    fn should_kill(&mut self) -> bool {
+        self.time >= self.warning_time + self.show_time
+    }
+}
