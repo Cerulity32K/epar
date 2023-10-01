@@ -31,7 +31,8 @@ pub enum EparLevel {
     Granite,
     Isolation,
     Kocmoc,
-    Sparkler
+    Sparkler,
+    Firestarter
 }
 impl EparLevel {
     pub fn level(&self) -> LevelLoader {
@@ -44,7 +45,8 @@ impl EparLevel {
             EparLevel::Inferno => levels::inferno,
             EparLevel::Isolation => levels::isolation,
             EparLevel::Kocmoc => levels::kocmoc,
-            EparLevel::Sparkler => levels::sparkler
+            EparLevel::Sparkler => levels::sparkler,
+            EparLevel::Firestarter => levels::firestarter
         }
     }
     pub fn name(&self) -> &'static str {
@@ -56,7 +58,8 @@ impl EparLevel {
             EparLevel::Inferno => "Inferno",
             EparLevel::Isolation => "Isolation (LIMBO Remix)",
             EparLevel::Kocmoc => "KOCMOC (Albee Remix)",
-            EparLevel::Sparkler => "Sparkler"
+            EparLevel::Sparkler => "Sparkler",
+            EparLevel::Firestarter => "Firestarter",
         }
     }
     /// Used to filter out levels that are under development
@@ -67,7 +70,8 @@ impl EparLevel {
                 Inferno,
                 FriendlyFaithPlate,
                 Isolation,
-                Sparkler
+                Sparkler,
+                Firestarter
             ) => false,
             _ => true
         }

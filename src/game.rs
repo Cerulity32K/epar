@@ -220,7 +220,7 @@ impl GameState {
         self.add_event(GSEvent(f32::NEG_INFINITY, Box::new(event)))
     }
     pub fn add_events(&mut self, events: impl IntoIterator<Item = GSEvent>) {
-        self.events.append(&mut events.into_iter().collect::<Vec<GSEvent>>());
+        self.events.append(&mut events.into_iter().collect::<Vec<GSEvent>>())
     }
     /// Call after initializing the events and before the update loop.
     pub fn sort(&mut self) {

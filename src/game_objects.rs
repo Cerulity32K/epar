@@ -865,7 +865,7 @@ impl Obstacle for GOLGrid {
                             center: vec2(x as f32, y as f32) * pfac + pfac / 2.0,
                             size: pfac,
                             rot: 0.0,
-                            warning_time: if first {self.first_warning_time } else { self.warning_time },
+                            warning_time: if first { self.first_warning_time } else { self.warning_time },
                             show_time: self.period * 1.25,
                             current_time: 0.0,
                             grow_time: self.period / 4.0,

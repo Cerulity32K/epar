@@ -9,10 +9,11 @@ use std::{sync::{Arc, Mutex}, error::Error};
 
 use macroquad::{window::next_frame, prelude::*, time::get_frame_time};
 use soloud::{Soloud, SoloudFlag, Backend, Wav, AudioExt, LoadExt};
+use strum::{IntoEnumIterator, EnumCount};
+
 use sound::Music;
 use game::GameState;
 use state_control::{EparState, EparLevel};
-use strum::{IntoEnumIterator, EnumCount};
 use utils::{screen_size, cmul};
 
 mod sound;

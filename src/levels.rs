@@ -2,7 +2,22 @@ use std::f32::{consts::{PI, TAU, FRAC_PI_2}, NEG_INFINITY};
 
 use macroquad::{prelude::{vec2, ORANGE, BLACK, WHITE, Vec2, RED, YELLOW, SKYBLUE, GRAY, Color}, window::{screen_width, screen_height}, rand::gen_range};
 
-use crate::{game::{GameState, GSEvent, UpdateAccumulator, ModifyArgs}, generators::{repeat_periodic, clone_offset, remove}, spawners::{HorLaserSpawner, LaserSpawner, BombSideSpawner}, game_objects::{Obst, Pellet, Periodic, SlamLaser, RotatableRect, Bomb, RotatingRect, CenterProj, CenterEvent, Obstacle, GOLGrid, GrowLaser, Ease, SpinningArc}, utils::{cmul, gay, mix, screen_center, screen_size, rand_vec, floor_vec, screen, tev_rep, ez, repeat_events, rep_off, gen_sign}};
+// imports galore
+use crate::{
+    game::{GameState, GSEvent, UpdateAccumulator, ModifyArgs},
+    generators::{repeat_periodic, clone_offset, remove},
+    spawners::{HorLaserSpawner, LaserSpawner, BombSideSpawner},
+    game_objects::{
+        Obst, Pellet, Periodic, SlamLaser, RotatableRect, Bomb, RotatingRect, CenterProj,
+        CenterEvent, Obstacle,
+        GOLGrid, GrowLaser, Ease, SpinningArc
+    },
+    utils::{
+        cmul, gay, mix, screen_center, screen_size, rand_vec,
+        floor_vec, screen, tev_rep, ez, repeat_events, rep_off,
+        gen_sign, sq
+    }
+};
 
 /// Function OBstacle Event
 macro_rules! fobe {
@@ -552,11 +567,11 @@ pub fn isolation(state: &mut GameState) -> (f32, f32, &'static str) {
 pub fn kocmoc(state: &mut GameState) -> (f32, f32, &'static str) {
     let bpm = 95.0;
 
-    state.instantly(Box::new(|accum: &mut UpdateAccumulator, _| {
+    state.instantly(|accum: &mut UpdateAccumulator, _| {
         accum.float(20.0);
         accum.bg(BLACK);
         accum.fg(GRAY);
-    }));
+    });
 
     state.event(-33.0, |accum: &mut UpdateAccumulator, _| {
         accum.obst(
@@ -732,4 +747,30 @@ pub fn sparkler(state: &mut GameState) -> (f32, f32, &'static str) {
     let bpm = 108.5;
     
     (-17.886 * bpm / 60.0, bpm, "music/sparkler.mp3")
+}
+// Tanger - Firestarter
+pub fn firestarter(state: &mut GameState) -> (f32, f32, &'static str) {
+    let diag_rad = (sq(screen_height()) + sq(screen_width())).sqrt();
+    let bpm = 135.0;
+    state.instantly(|accum: &mut UpdateAccumulator, _| {
+        accum.bg(cmul(SKYBLUE, 0.2));
+        accum.fg(ORANGE);
+    });
+    for (idx, i) in [-4.0, -3.75, -3.5, -3.375, -3.25, -3.0, -2.75, -2.5, -2.25].into_iter().enumerate() {
+        let p = (idx as f32 + 0.25) * TAU / 9.0;
+        state.event(i, move |accum: &mut UpdateAccumulator, _| {
+            let circ = vec2(
+                p.sin(),
+                p.cos()
+            );
+            accum.obst(GrowLaser::new(
+                circ * diag_rad + screen_center(), -circ * diag_rad + screen_center(),
+                30.0, 2.0, 1.0, circ * 20.0
+            ))
+        });
+    }
+    state.event(-2.0, |accum: &mut UpdateAccumulator, _| {
+        accum.obst(SlamLaser::new(screen(0.5, -0.1), screen(0.5, 1.1), 200.0, 2.0, 2.0, 0.2, vec2(0.0, 0.0), 80.0));
+    });
+    (-1.978 * bpm / 60.0, bpm, "music/firestarter.mp3")
 }
