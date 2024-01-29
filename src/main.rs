@@ -12,7 +12,7 @@ use soloud::{Soloud, SoloudFlag, Backend, Wav, AudioExt, LoadExt};
 use strum::{IntoEnumIterator, EnumCount};
 
 use sound::Music;
-use game::GameState;
+use game::{GameState, LevelState};
 use state_control::{EparState, EparLevel};
 use utils::{screen_size, cmul};
 
@@ -46,7 +46,7 @@ async fn main() -> CanErr {
     //let sfx = SfxCreator::new(sl.clone());
     let mut state = GameState::new(Music::new(sl.clone()));
     loop {
-        match state.epar_state {
+        match &mut state.state {
             EparState::MainMenu => {
                 let show_unfinished = is_key_down(KeyCode::U);
                 let lvls = EparLevel::iter().filter(move |lvl| show_unfinished || lvl.finished()).collect::<Vec<_>>();
@@ -68,9 +68,9 @@ async fn main() -> CanErr {
                         color = cmul(WHITE, 0.3);
                         if is_mouse_button_pressed(MouseButton::Left) {
                             macroquad::rand::srand((get_time() * 1_000_000.0) as u64);
+                            state.state = EparState::InGame(LevelState::new());
                             state.reset();
                             state.load_level(lvl, start, speed);
-                            state.epar_state = EparState::InGame;
                             break 'elit;
                         }
                     } else {
@@ -84,8 +84,8 @@ async fn main() -> CanErr {
                 }
                 next_frame().await;
             }
-            EparState::InGame => {
-                state.player.pos = vec2(0.125, 0.5) * screen_size();
+            EparState::InGame(ls) => {
+                ls.player.pos = vec2(0.125, 0.5) * screen_size();
                 while state.mus.is_playing() {
                     state.mus.check();
                     if let Some(f) = state.mus.current_beat() {
@@ -96,7 +96,7 @@ async fn main() -> CanErr {
                     state.draw();
                     next_frame().await;
                 }
-                state.epar_state = EparState::MainMenu;
+                state.state = EparState::MainMenu;
             }
         }
     }

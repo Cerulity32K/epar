@@ -239,10 +239,10 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
 
     // Color changes
     state.add_events([
-        GSEvent::new(16.0, |gs: &mut UpdateAccumulator, _| gs.smi(|state: &mut GameState, _| {
-            state.bg_color = Box::new(|f: f32| cmul(gay(f), (-(f) % 1.0 + 1.0) * 0.375 + 0.125));
-            state.fg_color = Box::new(|f: f32| mix(gay(f + FRAC_PI_2), WHITE, 0.5));
-        })),
+        GSEvent::new(16.0, |gs: &mut UpdateAccumulator, _| {
+            gs.bg_raw(Box::new(|f: f32| cmul(gay(f), (-(f) % 1.0 + 1.0) * 0.375 + 0.125)));
+            gs.fg_raw(Box::new(|f: f32| mix(gay(f + FRAC_PI_2), WHITE, 0.5)));
+        }),
         GSEvent::new(46.0, |gs: &mut UpdateAccumulator, _| {
             gs.bg(BLACK);
             gs.obst(Periodic::new(80, 0.125, Box::new(|accum: &mut UpdateAccumulator, smargs: ModifyArgs| {
@@ -250,9 +250,7 @@ pub fn moonlight_sonata(state: &mut GameState) -> (f32, f32, &'static str) {
             })))
         }),
         GSEvent::new(56.0, |gs: &mut UpdateAccumulator, _| {
-            gs.smi(|state: &mut GameState, _| {
-                state.fg_color = Box::new(|f: f32| cmul(WHITE, (f * TAU * 2.0).sin() / 4.0 + 0.75));
-            });
+            gs.fg_raw(Box::new(|f: f32| cmul(WHITE, (f * TAU * 2.0).sin() / 4.0 + 0.75)));
         })
     ]);
 
@@ -528,11 +526,9 @@ pub fn isolation(state: &mut GameState) -> (f32, f32, &'static str) {
     let bpm = 200.0;
     state.instantly(Box::new(|accum: &mut UpdateAccumulator, _| {
         accum.bg(Color::new(0.0, 0.1, 0.1, 1.0));
-        accum.smi(|gs: &mut GameState, _| {
-            let color1 = Color::new(0.0, 1.0, 0.75, 1.0);
-            let color2 = Color::new(0.0, 0.5, 1.0, 1.0);
-            gs.fg_color = Box::new(move |t| mix(color1, color2, (t / 2.0).sin() / 2.0 + 0.5));
-        });
+        let color1 = Color::new(0.0, 1.0, 0.75, 1.0);
+        let color2 = Color::new(0.0, 0.5, 1.0, 1.0);
+        accum.fg_raw(Box::new(move |t: f32| mix(color1, color2, (t / 2.0).sin() / 2.0 + 0.5)));
     }));
     state.add_event(GSEvent(-8.0, Box::new(|accum: &mut UpdateAccumulator, _| {
         let max = 2;
@@ -588,9 +584,7 @@ pub fn kocmoc(state: &mut GameState) -> (f32, f32, &'static str) {
         );
     });
     state.event(-16.0, |accum: &mut UpdateAccumulator, _| {
-        accum.smi(|state: &mut GameState, _| {
-            state.bg_color = Box::new(|t| cmul(RED, (t + 16.0) / 16.0));
-        });
+        accum.bg_raw(Box::new(|t| cmul(RED, (t + 16.0) / 16.0)));
     });
     state.event(-1.0, |accum: &mut UpdateAccumulator, _| {
         accum.bg(BLACK);
@@ -627,18 +621,16 @@ pub fn kocmoc(state: &mut GameState) -> (f32, f32, &'static str) {
     });
     state.event(0.0, |accum: &mut UpdateAccumulator, _| {
         accum.float(50.0);
-        accum.smi(|state: &mut GameState, _| {
-            state.fg_color = Box::new(|t| mix(
-                Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
-                Color { r: 0.5, g: 0.5, b: 1.0, a: 1.0 },
-                (t * 20.0).sin() * 0.5 + 0.5
-            ));
-            state.bg_color = Box::new(|t| mix(
-                Color { r: 0.2, g: 0.1, b: 0.1, a: 1.0 },
-                Color { r: 0.2, g: 0.1, b: 0.2, a: 1.0 },
-                (t * 20.0).sin() * 0.5 + 0.5
-            ));
-        });
+        accum.fg_raw(Box::new(|t: f32| mix(
+            Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
+            Color { r: 0.5, g: 0.5, b: 1.0, a: 1.0 },
+            (t * 20.0).sin() * 0.5 + 0.5
+        )));
+        accum.bg_raw(Box::new(|t: f32| mix(
+            Color { r: 0.2, g: 0.1, b: 0.1, a: 1.0 },
+            Color { r: 0.2, g: 0.1, b: 0.2, a: 1.0 },
+            (t * 20.0).sin() * 0.5 + 0.5
+        )));
     });
     state.event(31.0, |accum: &mut UpdateAccumulator, _| {
         for i in 0..11 {
@@ -687,20 +679,16 @@ pub fn kocmoc(state: &mut GameState) -> (f32, f32, &'static str) {
                 accum.obst(proj.clone());
     });
     state.event(32.0, |accum: &mut UpdateAccumulator, _| {
-        accum.bg(BLACK);
-
-        accum.smi(|state: &mut GameState, _| {
-            state.bg_color = Box::new(|t| cmul(mix(
-                Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
-                Color { r: 0.5, g: 0.5, b: 1.0, a: 1.0 },
-                (t * 20.0).sin() * 0.5 + 0.5
-            ), 1.0));
-            state.fg_color = Box::new(|t| cmul(mix(
-                Color { r: 1.0, g: 0.5, b: 0.5, a: 1.0 },
-                Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
-                (t * 20.0).sin() * 0.5 + 0.5
-            ), 0.25));
-        });
+        accum.bg_raw(Box::new(|t: f32| cmul(mix(
+            Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
+            Color { r: 0.5, g: 0.5, b: 1.0, a: 1.0 },
+            (t * 20.0).sin() * 0.5 + 0.5
+        ), 1.0)));
+        accum.fg_raw(Box::new(|t: f32| cmul(mix(
+            Color { r: 1.0, g: 0.5, b: 0.5, a: 1.0 },
+            Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
+            (t * 20.0).sin() * 0.5 + 0.5
+        ), 0.25)));
     });
     state.event(62.0, |accum: &mut UpdateAccumulator, _| {
         accum.obst(
@@ -727,18 +715,16 @@ pub fn kocmoc(state: &mut GameState) -> (f32, f32, &'static str) {
     });
     state.event(64.0, |accum: &mut UpdateAccumulator, _| {
         accum.float(20.0);
-        accum.smi(|state: &mut GameState, _| {
-            state.fg_color = Box::new(|t| mix(
-                Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
-                Color { r: 0.5, g: 0.5, b: 1.0, a: 1.0 },
-                (t * 2.0).sin() * 0.5 + 0.5
-            ));
-            state.bg_color = Box::new(|t| mix(
-                Color { r: 0.2, g: 0.1, b: 0.1, a: 1.0 },
-                Color { r: 0.2, g: 0.1, b: 0.2, a: 1.0 },
-                (t * 2.0).sin() * 0.5 + 0.5
-            ));
-        });
+        accum.fg_raw(Box::new(|t: f32| mix(
+            Color { r: 1.0, g: 0.5, b: 1.0, a: 1.0 },
+            Color { r: 0.5, g: 0.5, b: 1.0, a: 1.0 },
+            (t * 2.0).sin() * 0.5 + 0.5
+        )));
+        accum.bg_raw(Box::new(|t: f32| mix(
+            Color { r: 0.2, g: 0.1, b: 0.1, a: 1.0 },
+            Color { r: 0.2, g: 0.1, b: 0.2, a: 1.0 },
+            (t * 2.0).sin() * 0.5 + 0.5
+        )));
     });
 
     (-21.294 * bpm / 60.0, bpm, "music/kocmoc2.mp3")

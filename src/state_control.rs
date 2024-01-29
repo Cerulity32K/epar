@@ -1,16 +1,50 @@
 use std::{error::Error, fmt::Display};
 
+use macroquad::color::Color;
 use soloud::{Wav, AudioExt, LoadExt};
 
-use crate::{game::GameState, sound::Music};
+use crate::{game::{GameState, LevelState, ColorEase, StateModifier, ModifyArgs}, sound::Music};
 
 pub type LevelInfo = (f32, f32, &'static str);
 pub type LevelLoader = fn(&mut GameState) -> LevelInfo;
 
-#[derive(Debug)]
 pub enum EparState {
     MainMenu,
-    InGame
+    InGame(LevelState)
+}
+impl EparState {
+    pub fn map<R, F: FnOnce(&mut LevelState) -> R>(&mut self, map_fn: F) -> Option<R> {
+        if let EparState::InGame(state) = self {
+            Some(map_fn(state))
+        } else { None }
+    }
+}
+
+pub struct ColorChange {
+    color: Box<dyn ColorEase>,
+    is_fg: bool
+}
+impl ColorChange {
+    pub fn fg(fg: Box<dyn ColorEase>) -> Self {
+        Self { color: fg, is_fg: true }
+    }
+    pub fn bg(bg: Box<dyn ColorEase>) -> Self {
+        Self { color: bg, is_fg: false }
+    }
+}
+impl StateModifier for ColorChange {
+    fn box_clone(&self) -> Box<dyn StateModifier> {
+        Box::new(Self { color: self.color.box_clone(), is_fg: self.is_fg })
+    }
+    fn run(&self, state: &mut GameState, _: ModifyArgs) {
+        state.state.map(|s|
+            if self.is_fg {
+                s.fg_color = self.color.box_clone();
+            } else {
+                s.bg_color = self.color.box_clone();
+            }
+        ).unwrap_or(())
+    }
 }
 
 macro_rules! pat_lvls {
