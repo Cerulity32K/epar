@@ -1,5 +1,5 @@
 # Exclusively Polygons Alongside Rhythms
-An event-based remake of Just Shapes and Beats' mechanics. Based on `soloud` for audio and `macroquad` for graphics.
+An event-based remake of Just Shapes and Beats' mechanics. Based on `soloud` for audio and `macroquad` for graphics. Made to learn more advanced dynamic Rust.
 
 # Usage
 In the main menu, a list of levels will appear.\
@@ -14,6 +14,6 @@ You can hold U in the main menu to view and "play" levels under development.
 - Be able to create and debug collisions using math.
 
 # Findings
-- All dynamic objects are `Box`es, and a `box_clone(&self) -> Box<dyn ...>` trait method keeps dynamic resolution (`dyn Clone` is not resolvable as `Self` can vary).
+- All dynamic objects are `Box`es, and a `box_clone(&self) -> Box<dyn ...>` trait method keeps dynamic resolution (`dyn Clone` is not resolvable).
 - Soloud allows you to query sound playback times, which are used to trigger events and update projectiles.
 - Employing a collision sweep across the screen displayed with squares can give a rough shape of collision boundaries, allowing for better collision debugging.
