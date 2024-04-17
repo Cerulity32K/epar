@@ -17,3 +17,6 @@ You can hold U in the main menu to view and "play" levels under development.
 - All dynamic objects are `Box`es, and a `box_clone(&self) -> Box<dyn ...>` trait method keeps dynamic resolution (`dyn Clone` is not resolvable).
 - Soloud allows you to query sound playback times, which are used to trigger events and update projectiles.
 - Employing a collision sweep across the screen displayed with squares can give a rough shape of collision boundaries, allowing for better collision debugging.
+
+# A Note on the Future of this Project
+I will likely be rewriting this project. In my opinion, it has turned into a mess. I will be creating a library for programmable animations, and will likely improve the structure of the code. This will let me recreate everything here, while also letting me customize a lot more.
